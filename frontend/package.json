@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint src --ext .js,.jsx",
+    "test": "react-scripts test --watchAll=false"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.9.0",
@@ -24,6 +25,7 @@
     "react-qr-code": "^2.0.18",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.9.3",
+    "react-scripts": "^5.0.1",
     "react-spinners": "^0.17.0",
     "tailwindcss": "^4.1.13"
   },

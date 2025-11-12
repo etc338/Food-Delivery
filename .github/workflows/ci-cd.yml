@@ -1,0 +1,52 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  frontend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm install
+      
+      - name: Lint Frontend
+        working-directory: ./frontend
+        run: npm run lint
+      
+      - name: Test Frontend
+        working-directory: ./frontend
+        run: npm test
+
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: npm install
+      
+      - name: Lint Backend
+        working-directory: ./backend
+        run: npm run lint
+      
+      - name: Test Backend
+        working-directory: ./backend
+        run: npm test

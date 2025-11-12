@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running frontend checks..."
+cd frontend && npm run lint -- --max-warnings=100
+
+echo "🔍 Running backend checks..."
+cd ../backend && npm run lint

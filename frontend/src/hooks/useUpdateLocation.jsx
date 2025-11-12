@@ -1,16 +1,16 @@
 import axios from "axios";
 import React, { useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import {
-  setCurrentAddress,
-  setCurrentCity,
-  setCurrentState,
-} from "../redux/userSlice";
-import { setAddress, setLocation } from "../redux/mapSlice";
+// import { useDispatch } from "react-redux";
+// import {
+//   setCurrentAddress,
+//   setCurrentCity,
+//   setCurrentState,
+// } from "../redux/userSlice";
+// import { setAddress, setLocation } from "../redux/mapSlice";
 import { serverUrl } from "../App";
 
 export default function useUpdateLocation() {
-  const dispatch = useDispatch();
+  // const dispatch = useDispatch();
  
   useEffect(() => {
    const updateLocation = async (latitude, longitude) => {
