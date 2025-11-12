@@ -6,12 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  HUSKY: 0
-
 jobs:
   frontend-checks:
     runs-on: ubuntu-latest
+    env:
+      HUSKY: 0
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,12 +19,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: './frontend/package-lock.json'
       
       - name: Install Frontend Dependencies
         working-directory: ./frontend
-        run: npm ci
+        run: |
+          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
       
       - name: Lint Frontend
         working-directory: ./frontend
@@ -33,6 +31,8 @@ jobs:
 
   backend-checks:
     runs-on: ubuntu-latest
+    env:
+      HUSKY: 0
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,12 +41,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: './backend/package-lock.json'
       
       - name: Install Backend Dependencies
         working-directory: ./backend
-        run: npm ci
+        run: |
+          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
       
       - name: Lint Backend
         working-directory: ./backend

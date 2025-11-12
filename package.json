@@ -7,7 +7,7 @@
     "backend"
   ],
   "scripts": {
-    "prepare": "husky"
+    "prepare": "node -e \"process.env.CI && process.exit(0); const h = require('husky'); h()\" || echo 'Skipping husky'"
   },
   "devDependencies": {
     "husky": "^9.1.7"
