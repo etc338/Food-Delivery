@@ -6,13 +6,12 @@ import { useDispatch } from "react-redux";
 import { updateOrderStatus } from "../redux/userSlice";
 import { useState } from "react";
 
-
 export default function OwnerOrderCard({ data }) {
   const [availableBoys, setAvailableBoys] = useState([]);
   const dispatch = useDispatch();
   const handleUpdateStatus = async (orderId, shopId, status) => {
     try {
-     const result =  await axios.post(
+      const result = await axios.post(
         `${serverUrl}/api/order/update-status/${orderId}/${shopId}`,
         { status },
         { withCredentials: true }
@@ -68,7 +67,6 @@ export default function OwnerOrderCard({ data }) {
           </span>
         </span>
 
-
         <select
           onChange={(e) =>
             handleUpdateStatus(
@@ -86,15 +84,33 @@ export default function OwnerOrderCard({ data }) {
         </select>
       </div>
 
-          {data.shopOrders.status === "Out Of Delivery" && 
-          <div className="mt-3 p-2 border rounded-lg text-sm bg-orange-50">
-            <p>Available Delivery Boys:</p>
-            {availableBoys.length > 0 ? (
-              availableBoys.map((b, index) => (
-                <div key={index} className="text-gray-300">{b.name} - {b.mobile}</div>
-              ))
-            ) : <div>Waiting for delivery boy to accept </div>}
-          </div> }
+      {data?.shopOrders?.status === "Out Of Delivery" && (
+        <div className="mt-3 p-2 border rounded-lg text-sm bg-orange-50">
+          {/* Heading */}
+          <p>
+            {data?.shopOrders?.assignedDeliveryBoy
+              ? "Assigned Delivery Boy:"
+              : "Available Delivery Boys:"}
+          </p>
+
+          {/* Priority 1: Assigned Delivery Boy */}
+          {data?.shopOrders?.assignedDeliveryBoy ? (
+            <div>
+              {data.shopOrders.assignedDeliveryBoy.fullName} -
+              {data.shopOrders.assignedDeliveryBoy.mobile}
+            </div>
+          ) : /* Priority 2: Available Boys */ availableBoys?.length > 0 ? (
+            availableBoys.map((b, i) => (
+              <div key={i} className="text-gray-400">
+                {b.fullName} - {b.mobile}
+              </div>
+            ))
+          ) : (
+            /* Priority 3: Nothing available */
+            <div>Waiting for delivery boy to accept</div>
+          )}
+        </div>
+      )}
 
       <div className="text-right font-bold text-gray-800 text-sm">
         Total: ₹{data.shopOrders.subtotal}

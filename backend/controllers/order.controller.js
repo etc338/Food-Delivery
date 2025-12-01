@@ -90,7 +90,8 @@ export const getMyOrders = async (req, res) => {
         .sort({ createdAt: -1 })
         .populate("shopOrders.shop", "name")
         .populate("user")
-        .populate("shopOrders.shopOrderItems.item", "name image price");
+        .populate("shopOrders.shopOrderItems.item", "name image price")
+        .populate("shopOrders.assignedDeliveryBoy", "fullName mobile");
 
       const filteredOrders = orders.map((order) => ({
         _id: order._id,
@@ -131,13 +132,14 @@ export const updateOrderStatus = async (req, res) => {
 
     let deliveryBoysPayload = [];
 
-    if (status === "Out Of Delivery" || !shopOrder.assignment) {
+    if (status === "Out Of Delivery" && !shopOrder.assignment) {
       const { longitude, latitude } = order.deliveryAddress || {};
       if (longitude == null || latitude == null) {
         // no coordinates — can't search nearby
         await order.save();
         return res.status(200).json({
-          message: "Order status updated but delivery address coordinates missing",
+          message:
+            "Order status updated but delivery address coordinates missing",
         });
       }
 
@@ -156,7 +158,10 @@ export const updateOrderStatus = async (req, res) => {
       });
 
       // Ensure we have an array
-      if (!Array.isArray(nearByDeliveryBoys) || nearByDeliveryBoys.length === 0) {
+      if (
+        !Array.isArray(nearByDeliveryBoys) ||
+        nearByDeliveryBoys.length === 0
+      ) {
         await order.save();
         return res.status(200).json({
           message: "Order status updated but no nearby delivery boys found",
@@ -184,7 +189,8 @@ export const updateOrderStatus = async (req, res) => {
       if (candidates.length === 0) {
         await order.save();
         return res.status(200).json({
-          message: "Order status updated but there are no available delivery boys",
+          message:
+            "Order status updated but there are no available delivery boys",
         });
       }
 
@@ -224,7 +230,6 @@ export const updateOrderStatus = async (req, res) => {
       "fullName mobile email"
     );
 
-
     return res.status(200).json({
       shopOrder: updatedShopOrder,
       assignedDeliveryBoys: updatedShopOrder?.assignedDeliveryBoy || null,
@@ -238,3 +243,143 @@ export const updateOrderStatus = async (req, res) => {
   }
 };
 
+export const getDevliveryBoyAssignments = async (req, res) => {
+  try {
+    const deliveryBoyId = req.userId;
+    const assignment = await DeliveryAssignment.find({
+      brodcastedTo: deliveryBoyId,
+      status: "brodcasted",
+    })
+      .populate("orderId")
+      .populate("shop");
+
+    const formated = assignment.map((a) => ({
+      assignmentId: a._id,
+      orderId: a.orderId._id,
+      shopName: a.shop.name,
+      deliveryAddress: a.orderId.deliveryAddress,
+      items:
+        a.orderId.shopOrders.find(
+          (so) => so.shop.toString() === a.shop._id.toString()
+        ).shopOrderItems || [],
+      subtotal: a.orderId.shopOrders.find(
+        (so) => so.shop.toString() === a.shop._id.toString()
+      )?.subtotal,
+    }));
+
+    return res.status(200).json(formated);
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Server Error", error: error.message });
+  }
+};
+
+export const acceptOrder = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const assignment = await DeliveryAssignment.findById(assignmentId);
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+    if (assignment.status !== "brodcasted") {
+      return res.status(400).json({ message: "Assignment is not available" });
+    }
+
+    const alreadyAssigned = await DeliveryAssignment.findOne({
+      assignedTo: req.userId,
+      status: { $nin: ["brodcasted", "completed"] },
+    });
+
+    if (alreadyAssigned) {
+      return res
+        .status(400)
+        .json({ message: "You have already accepted another order" });
+    }
+
+    assignment.assignedTo = req.userId;
+    assignment.status = "assigned";
+    assignment.acceptedAt = new Date();
+    await assignment.save();
+
+    const order = await Order.findById(assignment.orderId);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+    const shopOrder = order.shopOrders.find(
+      (so) => so._id.toString() === assignment.shopOrderId.toString()
+    );
+    if (!shopOrder) {
+      return res.status(404).json({ message: "Shop order not found" });
+    }
+    shopOrder.assignedDeliveryBoy = req.userId;
+    await order.save();
+    return res
+      .status(200)
+      .json({ message: "Order accepted successfully", order });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Server Error", error: error.message });
+  }
+};
+
+export const getCurrentOrder = async (req, res) => {
+  try {
+    const assignment = await DeliveryAssignment.findOne({
+      assignedTo: req.userId,
+      status: "assigned",
+    })
+      .populate("assignedTo", "fullName mobile email location")
+      .populate("shop", "name")
+      .populate({
+        path: "orderId",
+        populate: [
+          { path: "user", select: "fullName mobile email, location" },
+          { path: "shopOrders.shop", select: "name" },
+          {
+            path: "shopOrders.shopOrderItems.item",
+            select: "name image price",
+          },
+        ],
+      });
+    if (!assignment) {
+      return res.status(404).json({ message: "No current order found" });
+    }
+    if (!assignment.orderId) {
+      return res
+        .status(404)
+        .json({ message: "Order not found for this assignment" });
+    }
+    const shopOrder = assignment.orderId.shopOrders.find(
+      (so) => so.shop.toString() === assignment.shop._id.toString()
+    );
+    if (!shopOrder) {
+      return res.status(404).json({ message: "Shop order not found" });
+    }
+    let deliveryBoyLocation = { lat: null, lon: null };
+    if (assignment.assignedTo.location.coordinates.length == 2) {
+      deliveryBoyLocation.lat = assignment.assignedTo.location.coordinates[1];
+      deliveryBoyLocation.lon = assignment.assignedTo.location.coordinates[0];
+    }
+    let customerLocation = { lat: null, lon: null };
+    if (assignment.orderId.deliveryAddress) {
+      customerLocation.lat = assignment.orderId.deliveryAddress.latitude;
+      customerLocation.lon = assignment.orderId.deliveryAddress.longitude;
+    }
+
+    return res.status(200).json({
+      _id: assignment.orderId._id,
+      user: assignment.orderId.user,
+      shopOrder,
+      deliveryBoyLocation,
+      customerLocation,
+      deliveryAddress: assignment.orderId.deliveryAddress,
+    });
+
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Server Error", error: error.message });
+  }
+};

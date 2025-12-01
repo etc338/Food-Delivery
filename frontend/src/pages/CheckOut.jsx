@@ -102,7 +102,7 @@ export default function CheckOut() {
         },
         { withCredentials: true }
       );
-      dispatch(addMyOrder(result.data));
+      dispatch(addMyOrder(result.data.order));
       navigate("/order-place");
     } catch (error) {
       console.error("Error placing order:", error);
