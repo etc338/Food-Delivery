@@ -4,10 +4,18 @@ import { IoArrowBack } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
 import UserOrderCard from "../components/UserOrderCard";
 import OwnerOrderCard from "../components/OwnerOrderCard";
+import { useDispatch } from "react-redux";
+import { setOrdersViewed } from "../redux/userSlice";
 
 export default function MyOrders() {
   const { userData, myOrders } = useSelector((state) => state.user);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  React.useEffect(() => {
+    // mark orders as viewed when this page mounts
+    dispatch(setOrdersViewed(true));
+  }, [dispatch]);
   return (
     <div className="w-full min-h-screen bg-[#fff9f6] flex justify-center px-4">
       <div className="w-full max-w-[880px] p-4">

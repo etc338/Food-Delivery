@@ -8,19 +8,21 @@ import { useDispatch, useSelector } from "react-redux";
 import { serverUrl } from "../App";
 import axios from "axios";
 import { setUserData } from "../redux/userSlice";
+import { useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { FaPlus } from "react-icons/fa";
 import { LuReceipt } from "react-icons/lu";
 
 export default function Nav() {
   const [showInfo, setShowInfo] = useState(false);
-  const { userData, currentCity, cartItems } = useSelector(
-    (state) => state.user
+  const { userData, currentCity, cartItems, myOrders, ordersViewed } = useSelector(
+    (state) => state.user,
   );
   const { myShopData } = useSelector((state) => state.owner);
   const [showSearch, setShowSearch] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const handleLogOut = async () => {
     try {
       await axios.get(`${serverUrl}/api/auth/signout`, {
@@ -111,30 +113,36 @@ export default function Nav() {
             >
               <LuReceipt size={20} />
               <span>My Orders</span>
-              <span className="absolute -right-2 -top-2 text-xs font-bold text-white bg-[#ff4d2d] rounded-full px-[6px] py-[1px]">
-                0
-              </span>
+              {myOrders?.length > 0 && !ordersViewed &&
+                !location.pathname.startsWith("/my-orders") && (
+                  <span className="absolute -right-2 -top-2 text-xs font-bold text-white bg-[#ff4d2d] rounded-full px-[6px] py-[1px]">
+                    {myOrders.length}
+                  </span>
+                )}
             </div>
             <div
               onClick={() => navigate("/my-orders")}
               className="md:hidden flex items-center gap-2 px-3 py-1 cursor-pointer rounded-lg bg-[#ff4d2d]/10 text-[#ff4d2d] font-medium relative"
             >
               <LuReceipt size={20} />
-              <span className="absolute -right-2 -top-2 text-xs font-bold text-white bg-[#ff4d2d] rounded-full px-[6px] py-[1px]">
-                0
-              </span>
+              {myOrders?.length > 0 && !ordersViewed &&
+                !location.pathname.startsWith("/my-orders") && (
+                  <span className="absolute -right-2 -top-2 text-xs font-bold text-white bg-[#ff4d2d] rounded-full px-[6px] py-[1px]">
+                    {myOrders.length}
+                  </span>
+                )}
             </div>
           </>
         ) : (
           <>
             {userData.role == "user" && (
               <div
-                className="cursor-pointer"
+                className="cursor-pointer relative"
                 onClick={() => navigate("/cart")}
               >
-                <IoCartOutline size={25} className="text-[#ff4d2d]" />
-                <span className="absolute right-[-9px] top-[-12px] text-[#ff4d2d]">
-                  {cartItems.length}
+                <IoCartOutline size={30} className="text-[#ff4d2d]" />
+                <span className="absolute -right-2 -top-2 text-xs font-bold text-white bg-[#ff4d2d] rounded-full px-[6px] py-[1px]">
+                  {cartItems?.length || 0}
                 </span>
               </div>
             )}
@@ -155,7 +163,9 @@ export default function Nav() {
           {userData.fullName.slice(0, 1)}
         </div>
         {showInfo && (
-          <div className={`fixed top-[80px] right-[10px] ${userData.role == "deliveryBoy" ? "md:right-[20%] lg:right-[40%]" : "md:right-[10%] lg:right-[25%]" } w-[180px] bg-white shadow-2xl rounded-xl p-[20px] flex flex-col gap-[10px] z-[9999]`}>
+          <div
+            className={`fixed top-[80px] right-[10px] ${userData.role == "deliveryBoy" ? "md:right-[20%] lg:right-[40%]" : "md:right-[10%] lg:right-[25%]"} w-[180px] bg-white shadow-2xl rounded-xl p-[20px] flex flex-col gap-[10px] z-[9999]`}
+          >
             <div className="text-[17px] fonr-semibold">{userData.fullName}</div>
             {userData.role == "user" && (
               <div

@@ -52,3 +52,22 @@ export const getShopByCity = async (req, res) => {
         return res.status(500).json({ message: "Server Error", error: error.message });
     }
 }
+
+export const getFeaturedShops = async (req, res) => {
+  try {
+    // Get random 10 shops from all cities as "featured"
+    // In production, you'd use ratings or popularity metrics
+    const shops = await Shop.aggregate([
+      { $sample: { size: 10 } }
+    ]);
+    
+    // Populate items
+    await Shop.populate(shops, { path: 'items', select: 'name image price category' });
+    
+    return res.status(200).json(shops);
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Server Error", error: error.message });
+  }
+};

@@ -2,6 +2,54 @@ import DeliveryAssignment from "../models/deliveryAssignment.model.js";
 import Order from "../models/order.model.js";
 import Shop from "../models/shop.model.js";
 import User from "../models/user.model.js";
+import Razorpay from "razorpay";
+import crypto from "crypto";
+
+export const createRazorpayOrder = async (req, res) => {
+  try {
+    const instance = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+
+    const options = {
+      amount: req.body.amount * 100, // amount in paise
+      currency: "INR",
+      receipt: "receipt_order_" + Math.random().toString(36).substring(7),
+    };
+
+    const order = await instance.orders.create(options);
+    if (!order) return res.status(500).json({ message: "Some error occured" });
+
+    res.json(order);
+  } catch (error) {
+    console.error("Razorpay Error:", error);
+    res.status(500).json({
+      message:
+        error?.error?.description || error.message || "Failed to create order",
+    });
+  }
+};
+
+export const verifyPayment = async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+      req.body;
+    const sign = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSign = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(sign.toString())
+      .digest("hex");
+
+    if (razorpay_signature === expectedSign) {
+      return res.status(200).json({ message: "Payment verified successfully" });
+    } else {
+      return res.status(400).json({ message: "Invalid signature sent!" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 export const placeOrder = async (req, res) => {
   try {
@@ -38,7 +86,7 @@ export const placeOrder = async (req, res) => {
       const items = groupItemsByShop[shopId];
       const subtotal = items.reduce(
         (acc, item) => acc + item.price * item.quantity,
-        0
+        0,
       );
       shopOrders.push({
         shop: shop._id,
@@ -97,7 +145,9 @@ export const getMyOrders = async (req, res) => {
         _id: order._id,
         user: order.user,
         paymentMethod: order.paymentMethod,
-        shopOrders: order.shopOrders.find((o) => o.shopOwner._id == req.userId),
+        shopOrders: order.shopOrders.find(
+          (o) => o.shopOwner.toString() === req.userId.toString(),
+        ),
         createdAt: order.createdAt,
         deliveryAddress: order.deliveryAddress,
       }));
@@ -122,7 +172,7 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     const shopOrder = order.shopOrders.find(
-      (o) => o._id.toString() === shopId || o.shop.toString() === shopId
+      (o) => o._id.toString() === shopId || o.shop.toString() === shopId,
     );
     if (!shopOrder) {
       return res.status(404).json({ message: "Shop order not found" });
@@ -181,7 +231,7 @@ export const updateOrderStatus = async (req, res) => {
 
       // Compare string forms of _id
       const availableBoys = nearByDeliveryBoys.filter(
-        (b) => !busyIdset.has(b._id.toString())
+        (b) => !busyIdset.has(b._id.toString()),
       );
 
       const candidates = availableBoys.map((b) => b._id);
@@ -220,14 +270,14 @@ export const updateOrderStatus = async (req, res) => {
     // Save parent doc (this will persist subdoc changes)
     await order.save();
     const updatedShopOrder = order.shopOrders.find(
-      (o) => o._id.toString() === shopId || o.shop.toString() === shopId
+      (o) => o._id.toString() === shopId || o.shop.toString() === shopId,
     );
 
     // Repopulate for fresh data
     await order.populate("shopOrders.shop", "name");
     await order.populate(
       "shopOrders.assignedDeliveryBoy",
-      "fullName mobile email"
+      "fullName mobile email",
     );
 
     return res.status(200).json({
@@ -260,10 +310,10 @@ export const getDevliveryBoyAssignments = async (req, res) => {
       deliveryAddress: a.orderId.deliveryAddress,
       items:
         a.orderId.shopOrders.find(
-          (so) => so.shop.toString() === a.shop._id.toString()
+          (so) => so.shop.toString() === a.shop._id.toString(),
         ).shopOrderItems || [],
       subtotal: a.orderId.shopOrders.find(
-        (so) => so.shop.toString() === a.shop._id.toString()
+        (so) => so.shop.toString() === a.shop._id.toString(),
       )?.subtotal,
     }));
 
@@ -307,7 +357,7 @@ export const acceptOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
     const shopOrder = order.shopOrders.find(
-      (so) => so._id.toString() === assignment.shopOrderId.toString()
+      (so) => so._id.toString() === assignment.shopOrderId.toString(),
     );
     if (!shopOrder) {
       return res.status(404).json({ message: "Shop order not found" });
@@ -352,7 +402,7 @@ export const getCurrentOrder = async (req, res) => {
         .json({ message: "Order not found for this assignment" });
     }
     const shopOrder = assignment.orderId.shopOrders.find(
-      (so) => so.shop.toString() === assignment.shop._id.toString()
+      (so) => so.shop.toString() === assignment.shop._id.toString(),
     );
     if (!shopOrder) {
       return res.status(404).json({ message: "Shop order not found" });
@@ -376,7 +426,6 @@ export const getCurrentOrder = async (req, res) => {
       customerLocation,
       deliveryAddress: assignment.orderId.deliveryAddress,
     });
-
   } catch (error) {
     return res
       .status(500)

@@ -7,6 +7,11 @@ import { updateOrderStatus } from "../redux/userSlice";
 import { useState } from "react";
 
 export default function OwnerOrderCard({ data }) {
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  };
   const [availableBoys, setAvailableBoys] = useState([]);
   const dispatch = useDispatch();
   const handleUpdateStatus = async (orderId, shopId, status) => {
@@ -14,7 +19,7 @@ export default function OwnerOrderCard({ data }) {
       const result = await axios.post(
         `${serverUrl}/api/order/update-status/${orderId}/${shopId}`,
         { status },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       dispatch(updateOrderStatus({ orderId, shopId, status }));
       setAvailableBoys(result.data.availableBoys);
@@ -37,8 +42,7 @@ export default function OwnerOrderCard({ data }) {
       <div className="flex-col flex items-start gap-2 text-gray-600 text-sm">
         <p>{data.deliveryAddress.text}</p>
         <p className="text-xs text-gray-500">
-          Lat: {data.deliveryAddress.latitude}, Lon:{" "}
-          {data.deliveryAddress.longitude}
+          Date: {formatDate(data.createdAt)}
         </p>
       </div>
       <div className="flex space-x-4 overflow-x-auto pb-2">
@@ -72,7 +76,7 @@ export default function OwnerOrderCard({ data }) {
             handleUpdateStatus(
               data._id,
               data.shopOrders.shop._id,
-              e.target.value
+              e.target.value,
             )
           }
           className="rounded-md border border-[#ff4d2d] px-3 py-1 text-sm focus:outline-none focus:ring-2"

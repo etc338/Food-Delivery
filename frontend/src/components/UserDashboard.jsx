@@ -9,7 +9,7 @@ import FoodCard from "./FoodCard";
 
 export default function UserDashboard() {
   const { currentCity, shopInMyCity, itemsInMyCity } = useSelector(
-    (state) => state.user
+    (state) => state.user,
   );
   const catScrollRef = useRef();
   const shopScrollRef = useRef();
@@ -23,7 +23,7 @@ export default function UserDashboard() {
     if (element) {
       setLeftButton(element.scrollLeft > 0);
       setRightButton(
-        element.scrollLeft + element.clientWidth < element.scrollWidth
+        element.scrollLeft + element.clientWidth < element.scrollWidth,
       );
     }
   };
@@ -48,7 +48,7 @@ export default function UserDashboard() {
         updateButton(
           catScrollRef,
           setShowLeftCateButton,
-          setShowRightCateButton
+          setShowRightCateButton,
         );
       };
 
@@ -70,14 +70,14 @@ export default function UserDashboard() {
       updateButton(
         shopScrollRef,
         setShowLeftShopButton,
-        setShowRightShopButton
+        setShowRightShopButton,
       );
 
       const handleScroll = () => {
         updateButton(
           shopScrollRef,
           setShowLeftShopButton,
-          setShowRightShopButton
+          setShowRightShopButton,
         );
       };
 
@@ -143,9 +143,10 @@ export default function UserDashboard() {
             className="w-full flex overflow-x-auto gap-4 pb-2 "
             ref={shopScrollRef}
           >
-            {shopInMyCity.map((shop, index) => (
-              <CategoryCard key={index} name={shop.name} image={shop.image} />
-            ))}
+            {shopInMyCity &&
+              shopInMyCity.map((shop, index) => (
+                <CategoryCard key={index} name={shop.name} image={shop.image} />
+              ))}
           </div>
           {showRightShopButton && (
             <button className="absolute right-0 top-1/2 -translate-y-1/2 bg-[#ff4d2d] text-white p-2 rounded-full shadow-lg hover:bg-[#e64528] z-10">

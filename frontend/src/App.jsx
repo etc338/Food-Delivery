@@ -29,7 +29,16 @@ export default function App() {
   useGetShopByCity();
   useGetItemsByCity();
   useGetMyOrders();
-  const { userData } = useSelector((state) => state.user);
+  const { userData, isAuthReady } = useSelector((state) => state.user);
+
+  if (!isAuthReady) {
+    return (
+      <div className="h-screen flex items-center justify-center font-bold text-2xl text-gray-500">
+        Loading...
+      </div>
+    );
+  }
+
   return (
     <Routes>
       <Route

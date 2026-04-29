@@ -2,7 +2,7 @@ import axios from "axios";
 import React, { useEffect } from "react";
 import { serverUrl } from "../App";
 import { useDispatch } from "react-redux";
-import { setUserData } from "../redux/userSlice";
+import { setUserData, setIsAuthReady } from "../redux/userSlice";
 
 export default function useGetCurrentUser() {
   const dispatch = useDispatch();
@@ -15,8 +15,11 @@ export default function useGetCurrentUser() {
         dispatch(setUserData(result.data));
       } catch (error) {
         console.log(error);
+        dispatch(setUserData(null));
+      } finally {
+        dispatch(setIsAuthReady(true));
       }
     };
     fetchUser();
-  }, []);
+  }, [dispatch]);
 }

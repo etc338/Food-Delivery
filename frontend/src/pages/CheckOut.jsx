@@ -15,7 +15,6 @@ import axios from "axios";
 import { serverUrl } from "../App";
 import { addMyOrder } from "../redux/userSlice";
 
-
 function RecenterMap({ location }) {
   const map = useMap();
   if (location.lat && location.lon) {
@@ -23,7 +22,6 @@ function RecenterMap({ location }) {
   }
   return null;
 }
-
 
 export default function CheckOut() {
   const { location, address } = useSelector((state) => state.map);
@@ -36,25 +34,22 @@ export default function CheckOut() {
   const deliveryFee = totalAmount > 500 ? 0 : 40;
   const AmountWithDeliveryFee = totalAmount + deliveryFee;
 
-
   const onDragEnd = (e) => {
     const { lat, lng } = e.target.getLatLng();
     dispatch(setLocation({ lat: lat, lon: lng }));
     getAddressByLatLang(lat, lng);
   };
 
-
   const getAddressByLatLang = async (lat, lng) => {
     try {
       const result = await axios.get(
-        `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&format=json&apiKey=${apiKey}`
+        `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&format=json&apiKey=${apiKey}`,
       );
       dispatch(setAddress(result?.data?.results[0]?.address_line2));
     } catch (error) {
       console.error("Error fetching address:", error);
     }
   };
-
 
   const getCurrentLocation = () => {
     navigator.geolocation.getCurrentPosition(async (postition) => {
@@ -65,13 +60,12 @@ export default function CheckOut() {
     });
   };
 
-
   const getLatLongByAddress = async () => {
     try {
       const result = await axios.get(
         `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
-          addressInput
-        )}&apiKey=${apiKey}`
+          addressInput,
+        )}&apiKey=${apiKey}`,
       );
       const { lat, lon } = result.data.features[0].properties;
       dispatch(setLocation({ lat, lon }));
@@ -80,13 +74,97 @@ export default function CheckOut() {
     }
   };
 
-
   useEffect(() => {
     setAddressInput(address);
   }, [address]);
 
+  // Load Razorpay Script
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => {
+        resolve(true);
+      };
+      script.onerror = () => {
+        resolve(false);
+      };
+      document.body.appendChild(script);
+    });
+  };
 
   const handlePlaceOrder = async () => {
+    if (paymentMethod === "online") {
+      const res = await loadRazorpayScript();
+      if (!res) {
+        alert("Razorpay SDK failed to load. Are you online?");
+        return;
+      }
+
+      try {
+        const orderResult = await axios.post(
+          `${serverUrl}/api/order/create-razorpay-order`,
+          {
+            amount: AmountWithDeliveryFee,
+          },
+          { withCredentials: true },
+        );
+
+        if (!orderResult.data) {
+          alert("Server error. Are you online?");
+          return;
+        }
+
+        const { amount, id: order_id, currency } = orderResult.data;
+
+        const options = {
+          key:
+            import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_z37fDtdT8A3e4Y", // Enter the Key ID generated from the Dashboard
+          amount: amount.toString(),
+          currency: currency,
+          name: "Food Delivery App",
+          description: "Test Transaction",
+          order_id: order_id,
+          handler: async function (response) {
+            const data = {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+            };
+
+            const verifyResult = await axios.post(
+              `${serverUrl}/api/order/verify-payment`,
+              data,
+              { withCredentials: true },
+            );
+
+            if (verifyResult.data.message === "Payment verified successfully") {
+              placeOrderToDB();
+            } else {
+              alert("Payment verification failed");
+            }
+          },
+          prefill: {
+            name: "Test User",
+            email: "test@example.com",
+            contact: "9999999999",
+          },
+          theme: {
+            color: "#ff4d2d",
+          },
+        };
+
+        const paymentObject = new window.Razorpay(options);
+        paymentObject.open();
+      } catch (err) {
+        console.error("Error creating Razorpay Order:", err);
+      }
+    } else {
+      placeOrderToDB();
+    }
+  };
+
+  const placeOrderToDB = async () => {
     try {
       const result = await axios.post(
         `${serverUrl}/api/order/place-order`,
@@ -100,7 +178,7 @@ export default function CheckOut() {
           totalAmount,
           paymentMethod,
         },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       dispatch(addMyOrder(result.data.order));
       navigate("/order-place");
@@ -108,7 +186,6 @@ export default function CheckOut() {
       console.error("Error placing order:", error);
     }
   };
-
 
   return (
     <div className="min-h-screen bg-[#fff9f6] flex item-center justify-center p-6">
@@ -119,17 +196,14 @@ export default function CheckOut() {
         <IoArrowBack size={35} />
       </div>
 
-
       <div className="w-full max-w-[900px] bg-white rounded-2xl shadow-xl p-6 space-y-6">
         <h1 className="text-2xl font-bold text-gray-800">Checkout</h1>
-
 
         <section>
           <h2 className="text-lg font-semibold mb-2 flex items-center gap-2 text-gray-800">
             <FaLocationDot size={18} className="text-[#ff4d2d]" />
             Delivery Location
           </h2>
-
 
           <div className="flex gap-2 mb-3">
             <input
@@ -140,14 +214,12 @@ export default function CheckOut() {
               onChange={(e) => setAddressInput(e.target.value)}
             />
 
-
             <button
               onClick={() => getLatLongByAddress()}
               className="bg-[#ff4d2d] hover:bg-[#e64526] text-white px-3 py-2 rounded-lg flex items-center justify-center"
             >
               <IoIosSearch size={17} />
             </button>
-
 
             <button
               onClick={() => getCurrentLocation()}
@@ -156,7 +228,6 @@ export default function CheckOut() {
               <TbCurrentLocation size={17} />
             </button>
           </div>
-
 
           <div className="rounded-xl border overflow-hidden">
             <div className="h-64 w-full flex items-center justify-center">
@@ -172,7 +243,6 @@ export default function CheckOut() {
                 />
                 <RecenterMap location={location} />
 
-
                 <Marker
                   position={[location?.lat, location?.lon]}
                   draggable
@@ -183,12 +253,10 @@ export default function CheckOut() {
           </div>
         </section>
 
-
         <section>
           <h2 className="text-lg font-semibold mb-3 text-gray-800">
             Payment Method
           </h2>
-
 
           <div className="grid gird-cols-1 sm:grid-cols-2 gap-4">
             <div
@@ -203,17 +271,14 @@ export default function CheckOut() {
                 <MdDeliveryDining className="text-green-600 text-xl" />
               </span>
 
-
               <div>
                 <p className="font-medium text-gray-800">Cash On Delivery</p>
-
 
                 <p className="text-xs text-gray-500">
                   Pay when your food arrives
                 </p>
               </div>
             </div>
-
 
             <div
               className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${
@@ -227,17 +292,14 @@ export default function CheckOut() {
                 <FaMobileAlt className="text-purple-700 text-lg" />
               </span>
 
-
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-purple-100">
                 <FaCreditCard className="text-blue-700 text-lg" />
               </span>
-
 
               <div className="flex-1">
                 <p className="font-medium text-gray-800">
                   UPI / Credit / Debit Card
                 </p>
-
 
                 <p className="text-xs text-gray-500">Pay Securely Online</p>
               </div>
@@ -245,12 +307,10 @@ export default function CheckOut() {
           </div>
         </section>
 
-
         <section>
           <h2 className="text-lg font-semibold mb-3 text-gray-800">
             Order Summary
           </h2>
-
 
           <div className="rounded-xl border bg-gray-50 p-4 space-y-2">
             {cartItems.map((item, index) => (
@@ -270,12 +330,10 @@ export default function CheckOut() {
               <span>{totalAmount}</span>
             </div>
 
-
             <div className="flex justify-between text-gray-700">
               <span>Delivery Fee</span>
               <span>{deliveryFee == 0 ? "Free" : deliveryFee}</span>
             </div>
-
 
             <div className="flex justify-between text-[#ff4d2d] pt-2 text-lg font-bold">
               <span>Total</span>
@@ -283,7 +341,6 @@ export default function CheckOut() {
             </div>
           </div>
         </section>
-
 
         <button
           onClick={() => handlePlaceOrder()}

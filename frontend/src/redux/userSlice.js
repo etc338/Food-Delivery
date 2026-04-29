@@ -4,6 +4,7 @@ const userSlice = createSlice({
   name: "user",
   initialState: {
     userData: null,
+    isAuthReady: false,
     currentCity: null,
     currentState: null,
     currentAddress: null,
@@ -12,10 +13,14 @@ const userSlice = createSlice({
     cartItems: [],
     totalAmount: 0,
     myOrders: [],
+    ordersViewed: false,
   },
   reducers: {
     setUserData: (state, action) => {
       state.userData = action.payload;
+    },
+    setIsAuthReady: (state, action) => {
+      state.isAuthReady = action.payload;
     },
     setCurrentCity: (state, action) => {
       state.currentCity = action.payload;
@@ -43,7 +48,7 @@ const userSlice = createSlice({
 
       state.totalAmount = state.cartItems.reduce(
         (sum, i) => sum + i.quantity * i.price,
-        0
+        0,
       );
     },
     updateQuantity: (state, action) => {
@@ -54,7 +59,7 @@ const userSlice = createSlice({
       }
       state.totalAmount = state.cartItems.reduce(
         (sum, i) => sum + i.quantity * i.price,
-        0
+        0,
       );
     },
     removeCartItem: (state, action) => {
@@ -62,11 +67,14 @@ const userSlice = createSlice({
       state.cartItems = state.cartItems.filter((i) => i.id != id);
       state.totalAmount = state.cartItems.reduce(
         (sum, i) => sum + i.quantity * i.price,
-        0
+        0,
       );
     },
     setMyOrders: (state, action) => {
       state.myOrders = action.payload;
+    },
+    setOrdersViewed: (state, action) => {
+      state.ordersViewed = action.payload;
     },
     addMyOrder: (state, action) => {
       state.myOrders = [action.payload, ...state.myOrders];
@@ -77,12 +85,13 @@ const userSlice = createSlice({
       if (order.shopOrders && order.shopOrders.shop._id == shopId) {
         order.shopOrders.status = status;
       }
-    }
+    },
   },
 });
 
 export const {
   setUserData,
+  setIsAuthReady,
   setCurrentCity,
   setCurrentState,
   setCurrentAddress,
@@ -92,6 +101,7 @@ export const {
   updateQuantity,
   removeCartItem,
   setMyOrders,
+  setOrdersViewed,
   addMyOrder,
   updateOrderStatus,
 } = userSlice.actions;
