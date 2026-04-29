@@ -8,8 +8,10 @@ const userSlice = createSlice({
     currentCity: null,
     currentState: null,
     currentAddress: null,
+    locationBlocked: false,
     shopInMyCity: null,
     itemsInMyCity: null,
+    searchQuery: "",
     cartItems: [],
     totalAmount: 0,
     myOrders: [],
@@ -30,6 +32,12 @@ const userSlice = createSlice({
     },
     setCurrentAddress: (state, action) => {
       state.currentAddress = action.payload;
+    },
+    setLocationBlocked: (state, action) => {
+      state.locationBlocked = action.payload;
+    },
+    setSearchQuery: (state, action) => {
+      state.searchQuery = action.payload;
     },
     setShopInMyCity: (state, action) => {
       state.shopInMyCity = action.payload;
@@ -95,6 +103,8 @@ export const {
   setCurrentCity,
   setCurrentState,
   setCurrentAddress,
+  setLocationBlocked,
+  setSearchQuery,
   setShopInMyCity,
   setItemsInMyCity,
   addToCart,

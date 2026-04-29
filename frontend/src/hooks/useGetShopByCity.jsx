@@ -22,5 +22,6 @@ export default function useGetShopByCity() {
       }
     };
     fetchShops();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentCity]);
 }

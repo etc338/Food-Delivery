@@ -15,7 +15,12 @@ export default function MyOrders() {
   React.useEffect(() => {
     // mark orders as viewed when this page mounts
     dispatch(setOrdersViewed(true));
-  }, [dispatch]);
+    
+    // Persist to localStorage
+    if (userData) {
+      localStorage.setItem(`ordersViewed_${userData._id}`, "true");
+    }
+  }, [dispatch, userData]);
   return (
     <div className="w-full min-h-screen bg-[#fff9f6] flex justify-center px-4">
       <div className="w-full max-w-[880px] p-4">
