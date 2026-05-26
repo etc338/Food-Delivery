@@ -1,61 +1,58 @@
 import axios from "axios";
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { serverUrl } from "../App";
 import { useDispatch, useSelector } from "react-redux";
-import { setMyOrders } from "../redux/userSlice";
-import { setOrdersViewed } from "../redux/userSlice";
+import { setMyOrders, setOrdersViewed } from "../redux/userSlice";
+import { useSocket } from "../context/SocketContext";
 
 export default function useGetMyOrders() {
   const dispatch = useDispatch();
   const { userData } = useSelector((state) => state.user);
-  
+  const socketRef = useSocket();
+
   useEffect(() => {
     if (!userData) return;
-    
-    // Load ordersViewed state from localStorage on mount
-    const storedOrdersViewed = localStorage.getItem(`ordersViewed_${userData._id}`);
-    const storedOrderCount = localStorage.getItem(`orderCount_${userData._id}`);
-    
-    if (storedOrdersViewed === "true") {
-      dispatch(setOrdersViewed(true));
-    }
-    
+
+    // Use a "last viewed at" timestamp instead of a count.
+    // This way old orders from previous sessions never re-trigger the badge.
+    const lastViewedAt = localStorage.getItem(`lastViewedAt_${userData._id}`);
+
     const fetchOrders = async () => {
       try {
         const result = await axios.get(`${serverUrl}/api/order/my-orders`, {
           withCredentials: true,
         });
-        
-        const previousCount = parseInt(storedOrderCount) || 0;
-        const currentCount = result.data.length;
-        
-        // Check if there are NEW orders by comparing counts
-        const hasNewOrders = currentCount > previousCount;
-        
+
         dispatch(setMyOrders(result.data));
-        
-        // Store the current order count
-        localStorage.setItem(`orderCount_${userData._id}`, currentCount.toString());
-        
-        // Only reset ordersViewed if we have new orders
-        if (hasNewOrders) {
-          dispatch(setOrdersViewed(false));
-          localStorage.setItem(`ordersViewed_${userData._id}`, "false");
+
+        // There is a new (unviewed) order if any order's createdAt is newer
+        // than the last time the user visited /my-orders.
+        if (lastViewedAt) {
+          const hasNew = result.data.some(
+            (o) => new Date(o.createdAt).getTime() > parseInt(lastViewedAt)
+          );
+          dispatch(setOrdersViewed(!hasNew));
+        } else {
+          // First ever visit — mark all as viewed so badge doesn't spam on sign-in.
+          dispatch(setOrdersViewed(true));
         }
-        
-        console.log("Fetched orders:", result.data);
       } catch (error) {
         console.log(error);
       }
     };
-    
+
     fetchOrders();
-    
-    // Poll for new orders every 30 seconds for owners
-    if (userData.role === "owner") {
-      const interval = setInterval(fetchOrders, 30000);
-      return () => clearInterval(interval);
+
+    // Owners get real-time new-order notifications via socket.
+    const socket = socketRef?.current;
+    if (userData.role === "owner" && socket) {
+      const handleNewOrder = () => {
+        fetchOrders();
+        dispatch(setOrdersViewed(false));
+      };
+      socket.on("new:order", handleNewOrder);
+      return () => socket.off("new:order", handleNewOrder);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userData]);
+  }, [userData, socketRef?.current]);
 }

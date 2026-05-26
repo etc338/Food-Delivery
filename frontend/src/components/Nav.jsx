@@ -127,8 +127,8 @@ export default function Nav() {
               <span>My Orders</span>
               {myOrders?.length > 0 && !ordersViewed &&
                 !location.pathname.startsWith("/my-orders") && (
-                  <span className="absolute -right-2 -top-2 text-xs font-bold text-white bg-[#ff4d2d] rounded-full px-[6px] py-[1px]">
-                    {myOrders.length}
+                  <span className="absolute -right-2 -top-2 text-[10px] font-bold text-white bg-[#ff4d2d] rounded-full px-[6px] py-[1px]">
+                    New
                   </span>
                 )}
             </div>
@@ -139,8 +139,8 @@ export default function Nav() {
               <LuReceipt size={20} />
               {myOrders?.length > 0 && !ordersViewed &&
                 !location.pathname.startsWith("/my-orders") && (
-                  <span className="absolute -right-2 -top-2 text-xs font-bold text-white bg-[#ff4d2d] rounded-full px-[6px] py-[1px]">
-                    {myOrders.length}
+                  <span className="absolute -right-2 -top-2 text-[10px] font-bold text-white bg-[#ff4d2d] rounded-full px-[6px] py-[1px]">
+                    New
                   </span>
                 )}
             </div>

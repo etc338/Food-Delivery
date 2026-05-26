@@ -4,12 +4,19 @@ import { useSelector } from "react-redux";
 import axios from "axios";
 import { serverUrl } from "../App";
 import DeliveryBoyTracking from "./DeliveryBoyTracking";
+import useUpdateLocation from "../hooks/useUpdateLocation";
+import { useSocket } from "../context/SocketContext";
 
 export default function DeliveryBoy() {
   const { userData } = useSelector((state) => state.user);
   const [currentOrder, setCurrentOrder] = useState();
   const [avavilableAssignments, setAvavilableAssignments] = useState(null);
   const [locationName, setLocationName] = useState("");
+
+  useUpdateLocation();
+
+  const socketRef = useSocket();
+
   const getAssignments = async () => {
     try {
       const result = await axios.get(`${serverUrl}/api/order/get-assignments`, {
@@ -25,26 +32,23 @@ export default function DeliveryBoy() {
     try {
       const result = await axios.get(
         `${serverUrl}/api/order/get-current-order`,
-        {
-          withCredentials: true,
-        },
+        { withCredentials: true },
       );
       setCurrentOrder(result.data);
     } catch (error) {
-      console.log(error);
+      setCurrentOrder(null);
+      console.error(error);
     }
   };
 
   const acceptOrder = async (assignmentId) => {
     try {
-      const result = await axios.get(
+      await axios.get(
         `${serverUrl}/api/order/accept-order/${assignmentId}`,
-        {
-          withCredentials: true,
-        },
+        { withCredentials: true },
       );
-      console.log(result.data);
       await getCurrentOrder();
+      setAvavilableAssignments([]);
     } catch (error) {
       console.log(error);
     }
@@ -56,13 +60,37 @@ export default function DeliveryBoy() {
   }, [userData]);
 
   useEffect(() => {
-    // reverse geocode delivery boy location to show readable name
+    const socket = socketRef?.current;
+    if (!socket) return;
+
+    const handleNewAssignment = () => {
+      getAssignments();
+    };
+
+    const handleAssignmentTaken = ({ assignmentId }) => {
+      setAvavilableAssignments((prev) =>
+        prev ? prev.filter((a) => a.assignmentId !== assignmentId) : []
+      );
+    };
+
+    socket.on("new:assignment", handleNewAssignment);
+    socket.on("assignment:taken", handleAssignmentTaken);
+
+    return () => {
+      socket.off("new:assignment", handleNewAssignment);
+      socket.off("assignment:taken", handleAssignmentTaken);
+    };
+  }, [socketRef?.current]);
+
+  useEffect(() => {
     const fetchLocationName = async () => {
       try {
         const coords = userData?.location?.coordinates;
         if (!coords || !coords.length) return;
         const lat = coords[1];
         const lon = coords[0];
+        if (lat === 0 && lon === 0) return;
+
         const apiKey = import.meta.env.VITE_GEOAPIKEY;
         if (!apiKey) return;
         const res = await axios.get(
@@ -83,11 +111,11 @@ export default function DeliveryBoy() {
     };
     fetchLocationName();
   }, [userData?.location]);
+
   return (
     <div className="w-full min-h-screen bg-[#fff9f6] flex flex-col items-center pt-[100px]">
       <Nav />
       <div className="w-full max-w-[800px] flex flex-col gap-6 items-center px-4">
-        {/* Header Profile Card */}
         <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col justify-center text-center gap-3 items-center w-full md:w-[90%] border border-orange-100 relative overflow-hidden">
           <div className="absolute top-0 w-full h-2 bg-gradient-to-r from-orange-400 to-[#ff4d2d]"></div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 tracking-tight mt-2">
@@ -109,6 +137,10 @@ export default function DeliveryBoy() {
               </>
             )}
           </p>
+          <span className="flex items-center gap-1 text-xs text-green-600 font-semibold">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            Live — Socket connected
+          </span>
         </div>
 
         {!currentOrder && (
@@ -125,13 +157,9 @@ export default function DeliveryBoy() {
                     key={index}
                   >
                     <div className="flex flex-col gap-1 w-full sm:w-[75%]">
-                      <p className="text-base font-bold text-gray-800">
-                        {a?.shopName}
-                      </p>
-                      <p className="text-sm text-gray-600 leadng-relaxed line-clamp-2">
-                        <span className="font-semibold text-gray-700 mr-1">
-                          Delivery to:{" "}
-                        </span>
+                      <p className="text-base font-bold text-gray-800">{a?.shopName}</p>
+                      <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                        <span className="font-semibold text-gray-700 mr-1">Delivery to: </span>
                         {a?.deliveryAddress?.text || a?.deliveryAddress}
                       </p>
                       <div className="flex items-center gap-3 mt-1">
@@ -147,7 +175,7 @@ export default function DeliveryBoy() {
                       onClick={() => acceptOrder(a.assignmentId)}
                       className="bg-[#ff4d2d] text-white font-bold px-6 py-2 rounded-xl text-sm hover:bg-[#e64528] active:scale-95 transition-all w-full sm:w-auto shadow-md shadow-orange-200"
                     >
-                      Accept Let's Go
+                      Accept — Let's Go
                     </button>
                   </div>
                 ))
@@ -173,8 +201,7 @@ export default function DeliveryBoy() {
               </p>
               <p className="text-sm text-gray-600 mb-3">
                 <span className="font-semibold text-gray-700">Drop at: </span>
-                {currentOrder?.devliveryAddress ||
-                  currentOrder?.deliveryAddress?.text}
+                {currentOrder?.devliveryAddress || currentOrder?.deliveryAddress?.text}
               </p>
               <div className="flex gap-2">
                 <span className="text-xs font-semibold bg-white border text-gray-700 px-3 py-1 rounded-full">
@@ -187,7 +214,14 @@ export default function DeliveryBoy() {
             </div>
 
             <div className="w-full border-t pt-4">
-              <DeliveryBoyTracking data={currentOrder} />
+              <DeliveryBoyTracking
+                data={currentOrder}
+                customerId={currentOrder?.user?._id}
+                onDelivered={() => {
+                  setCurrentOrder(null);
+                  getAssignments();
+                }}
+              />
             </div>
           </div>
         )}

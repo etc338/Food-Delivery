@@ -162,12 +162,10 @@ export const googleAuth = async (req, res) => {
     let user = await User.findOne({ email });
     if (!user) {
       if (!mobile || !role) {
-        return res
-          .status(400)
-          .json({
-            message:
-              "Missing required fields for account creation. Please sign up first.",
-          });
+        return res.status(400).json({
+          message:
+            "Missing required fields for account creation. Please sign up first.",
+        });
       }
       user = await User.create({
         fullName,

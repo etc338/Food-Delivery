@@ -4,6 +4,7 @@ import { IoArrowBack } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
 import UserOrderCard from "../components/UserOrderCard";
 import OwnerOrderCard from "../components/OwnerOrderCard";
+import DeliveryBoyOrderCard from "../components/DeliveryBoyOrderCard";
 import { useDispatch } from "react-redux";
 import { setOrdersViewed } from "../redux/userSlice";
 
@@ -13,12 +14,9 @@ export default function MyOrders() {
   const dispatch = useDispatch();
 
   React.useEffect(() => {
-    // mark orders as viewed when this page mounts
     dispatch(setOrdersViewed(true));
-    
-    // Persist to localStorage
     if (userData) {
-      localStorage.setItem(`ordersViewed_${userData._id}`, "true");
+      localStorage.setItem(`lastViewedAt_${userData._id}`, Date.now().toString());
     }
   }, [dispatch, userData]);
   return (
@@ -34,11 +32,13 @@ export default function MyOrders() {
           <h1 className="text-2xl font-bold text-start">My Orders</h1>
         </div>
         <div className="space-y-6">
-          {myOrders?.map((order, index) =>
+          {myOrders?.map((order) =>
             userData.role === "user" ? (
-              <UserOrderCard key={index} data={order} />
+              <UserOrderCard key={order._id} data={order} />
             ) : userData.role === "owner" ? (
-              <OwnerOrderCard key={index} data={order} />
+              <OwnerOrderCard key={order._id} data={order} />
+            ) : userData.role === "deliveryBoy" ? (
+              <DeliveryBoyOrderCard key={order._id} data={order} />
             ) : null
           )}
         </div>
