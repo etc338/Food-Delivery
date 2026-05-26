@@ -125,7 +125,9 @@ export const placeOrder = async (req, res) => {
           io.to(so.shopOwner.toString()).emit("new:order", { orderId: order._id });
         }
       });
-    } catch (_) {}
+    } catch (err) {
+      console.error(err);
+    }
 
     res.status(201).json({ message: "Order placed successfully", order });
 
@@ -224,7 +226,9 @@ export const updateOrderStatus = async (req, res) => {
       try {
         const io = getIo();
         io.emit("delivery_boy_free");
-      } catch (_) {}
+      } catch (err) {
+        console.error(err);
+      }
     }
 
     if (status === "Out Of Delivery" && !shopOrder.assignment) {
@@ -372,7 +376,9 @@ export const updateOrderStatus = async (req, res) => {
             status,
           });
         }
-      } catch (_) {}
+      } catch (err) {
+        console.error(err);
+      }
     }
 
     return res.status(200).json({
@@ -490,7 +496,9 @@ export const acceptOrder = async (req, res) => {
 
       // Tell everyone that this boy is now busy so they can remove him from available lists
       io.emit("delivery_boy_busy", { boyId: req.userId });
-    } catch (_) {}
+    } catch (err) {
+      console.error(err);
+    }
 
     return res
       .status(200)
