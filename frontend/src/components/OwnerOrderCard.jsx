@@ -55,15 +55,23 @@ export default function OwnerOrderCard({ data }) {
       }
     };
 
+    const handleDeliveryTimeout = ({ orderId, shopId }) => {
+      if (orderId === data._id) {
+        alert(`Timeout! No delivery boys accepted Order #${orderId.slice(-6)}. You may need to cancel or re-assign.`);
+      }
+    };
+
     socket.on("order:status_updated", handleStatusUpdate);
     socket.on("order:assigned", handleOrderAssigned);
     socket.on("delivery_boy_busy", handleDeliveryBoyBusy);
     socket.on("delivery_boy_free", handleDeliveryBoyFree);
+    socket.on("delivery_timeout", handleDeliveryTimeout);
     return () => {
       socket.off("order:status_updated", handleStatusUpdate);
       socket.off("order:assigned", handleOrderAssigned);
       socket.off("delivery_boy_busy", handleDeliveryBoyBusy);
       socket.off("delivery_boy_free", handleDeliveryBoyFree);
+      socket.off("delivery_timeout", handleDeliveryTimeout);
     };
   }, [socketRef?.current, data._id, localStatus, assignedBoy]);
 
@@ -136,18 +144,18 @@ export default function OwnerOrderCard({ data }) {
           <span className="font-semibold capitalize text-[#ff4d2d]">{localStatus}</span>
         </span>
 
-        {localStatus !== "delivered" && (
+        {localStatus !== "delivered" && localStatus !== "Cancelled" && localStatus !== "cancelled" && (
           <select
             onChange={(e) =>
               handleUpdateStatus(data._id, data.shopOrders?.shop?._id, e.target.value)
             }
             className="rounded-md border border-[#ff4d2d] px-3 py-1 text-sm focus:outline-none focus:ring-2"
-            value=""
+            value={localStatus}
           >
-            <option value="">Change</option>
-            <option value="Pending">Pending</option>
+            <option value="pending">Pending</option>
             <option value="preparing">Preparing</option>
             <option value="Out Of Delivery">Out Of Delivery</option>
+            <option value="Cancelled">Reject/Cancel</option>
           </select>
         )}
       </div>
@@ -186,8 +194,13 @@ export default function OwnerOrderCard({ data }) {
         </div>
       )}
 
-      <div className="text-right font-bold text-gray-800 text-sm">
-        Total: ₹{data.shopOrders.subtotal}
+      <div className="flex justify-between items-center mt-2 border-t pt-3">
+        <div className="text-xs text-gray-500">
+          Customer Paid: ₹{data.totalAmount || "N/A"}
+        </div>
+        <div className="text-right font-bold text-green-700 text-sm bg-green-50 px-3 py-1 rounded-md border border-green-200">
+          Your Earnings: ₹{data.shopOrders.subtotal}
+        </div>
       </div>
     </div>
   );

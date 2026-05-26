@@ -11,7 +11,7 @@ export function SocketProvider({ children }) {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    if (!userData) {
+    if (!userData?._id) {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -31,7 +31,7 @@ export function SocketProvider({ children }) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [userData]);
+  }, [userData?._id]);
 
   return (
     <SocketContext.Provider value={socketRef}>

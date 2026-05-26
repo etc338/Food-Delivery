@@ -18,6 +18,15 @@ export default function UserOrderCard({ data }) {
   const dispatch = useDispatch();
   const { currentCity, locationBlocked } = useSelector((state) => state.user);
 
+  const handleCancelOrder = async () => {
+    try {
+      await axios.put(`${serverUrl}/api/order/cancel-order/${data._id}`, {}, { withCredentials: true });
+      setOrderStatus("Cancelled");
+    } catch (error) {
+      alert(error.response?.data?.message || "Failed to cancel order");
+    }
+  };
+
   const socketRef = useSocket();
 
   const formatDate = (dateString) => {
@@ -139,6 +148,15 @@ export default function UserOrderCard({ data }) {
       <div className="flex justify-between items-center border-t pt-2 gap-2">
         <p className="font-semibold">Total: ₹{data.totalAmount}</p>
         <div className="flex gap-2 flex-wrap justify-end">
+          {orderStatus?.toLowerCase() === "pending" && (
+            <button
+              onClick={handleCancelOrder}
+              className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              Cancel Order
+            </button>
+          )}
+
           {canTrack(orderStatus) && (
             <button
               onClick={() => setShowTracking(!showTracking)}

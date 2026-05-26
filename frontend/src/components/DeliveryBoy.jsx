@@ -12,6 +12,7 @@ export default function DeliveryBoy() {
   const [currentOrder, setCurrentOrder] = useState();
   const [avavilableAssignments, setAvavilableAssignments] = useState(null);
   const [locationName, setLocationName] = useState("");
+  const [isOnline, setIsOnline] = useState(userData?.isOnline || false);
 
   useUpdateLocation();
 
@@ -51,6 +52,23 @@ export default function DeliveryBoy() {
       setAvavilableAssignments([]);
     } catch (error) {
       console.log(error);
+    }
+  };
+
+  const handleToggleOnline = async () => {
+    try {
+      const newStatus = !isOnline;
+      await axios.put(
+        `${serverUrl}/api/user/toggle-status`,
+        { isOnline: newStatus },
+        { withCredentials: true }
+      );
+      setIsOnline(newStatus);
+      if (newStatus) {
+        getAssignments();
+      }
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -137,13 +155,24 @@ export default function DeliveryBoy() {
               </>
             )}
           </p>
-          <span className="flex items-center gap-1 text-xs text-green-600 font-semibold">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            Live — Socket connected
-          </span>
+          <div className="flex items-center gap-4 mt-2">
+            <span className="flex items-center gap-1 text-xs text-green-600 font-semibold">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              Live — Socket connected
+            </span>
+            <div className="flex items-center gap-2 border-l border-orange-200 pl-4">
+              <span className="text-sm font-semibold text-gray-700">{isOnline ? "Online (Receiving Orders)" : "Offline (Not Working)"}</span>
+              <button 
+                onClick={handleToggleOnline}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#ff4d2d] focus:ring-offset-2 ${isOnline ? 'bg-green-500' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isOnline ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+          </div>
         </div>
 
-        {!currentOrder && (
+        {!currentOrder && isOnline && (
           <div className="bg-white rounded-2xl p-6 shadow-lg w-full md:w-[90%] border border-orange-100 flex flex-col gap-4">
             <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800 border-b pb-3">
               <span className="text-2xl">🌍</span> Available Orders nearby
@@ -187,6 +216,14 @@ export default function DeliveryBoy() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {!currentOrder && !isOnline && (
+          <div className="bg-white rounded-2xl p-8 shadow-lg w-full md:w-[90%] border border-orange-100 flex flex-col items-center justify-center text-center">
+            <span className="text-4xl mb-3">😴</span>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">You are currently Offline</h2>
+            <p className="text-gray-500">Toggle your status to Online to start receiving delivery assignments in your area.</p>
           </div>
         )}
 
