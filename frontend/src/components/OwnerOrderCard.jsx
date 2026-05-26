@@ -55,7 +55,7 @@ export default function OwnerOrderCard({ data }) {
       }
     };
 
-    const handleDeliveryTimeout = ({ orderId, shopId }) => {
+    const handleDeliveryTimeout = ({ orderId }) => {
       if (orderId === data._id) {
         alert(`Timeout! No delivery boys accepted Order #${orderId.slice(-6)}. You may need to cancel or re-assign.`);
       }
