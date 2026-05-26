@@ -160,6 +160,7 @@ export const getMyOrders = async (req, res) => {
         _id: order._id,
         user: order.user,
         paymentMethod: order.paymentMethod,
+        totalAmount: order.totalAmount,
         shopOrders: order.shopOrders.find(
           (o) => o.shopOwner.toString() === req.userId.toString(),
         ),
@@ -231,6 +232,26 @@ export const updateOrderStatus = async (req, res) => {
       }
     }
 
+    if (status.toLowerCase() === "cancelled" && shopOrder.assignment) {
+      try {
+        const assignment = await DeliveryAssignment.findById(shopOrder.assignment);
+        if (assignment && assignment.status === "brodcasted") {
+          assignment.status = "cancelled";
+          await assignment.save();
+          
+          const io = getIo();
+          // Tell all broadcasted boys to remove this assignment from their screen
+          assignment.brodcastedTo.forEach((boyId) => {
+            io.to(boyId.toString()).emit("assignment:taken", {
+              assignmentId: assignment._id,
+            });
+          });
+        }
+      } catch (err) {
+        console.error("Error cancelling assignment:", err);
+      }
+    }
+
     if (status === "Out Of Delivery" && !shopOrder.assignment) {
       const { longitude, latitude } = order.deliveryAddress || {};
       console.log("Delivery address coordinates:", { longitude, latitude });
@@ -248,6 +269,7 @@ export const updateOrderStatus = async (req, res) => {
       // Use find() to get an array of nearby delivery boys
       const nearByDeliveryBoys = await User.find({
         role: "deliveryBoy",
+        isOnline: true,
         location: {
           $near: {
             $geometry: {
@@ -339,6 +361,28 @@ export const updateOrderStatus = async (req, res) => {
         });
       });
 
+      // Add a 5-minute timeout. If no one accepts, notify the Shop Owner.
+      setTimeout(async () => {
+        try {
+          const assignment = await DeliveryAssignment.findById(deliveryAssignment._id);
+          if (assignment && assignment.status === "brodcasted" && !assignment.assignedTo) {
+            assignment.status = "failed";
+            await assignment.save();
+            
+            // Notify Shop Owner
+            if (shopOrder.shopOwner) {
+              io.to(shopOrder.shopOwner.toString()).emit("delivery_timeout", {
+                orderId: order._id,
+                shopId: shopOrder.shop.toString()
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Timeout handler error:", e);
+        }
+      }, 5 * 60 * 1000);
+      
+
       // Also notify the customer that their order is out for delivery.
       io.to(order.user.toString()).emit("order:status_updated", {
         orderId: order._id,
@@ -404,7 +448,21 @@ export const getDevliveryBoyAssignments = async (req, res) => {
       .populate("orderId")
       .populate("shop");
 
-    const formated = assignment.map((a) => ({
+    // Extra layer of protection: Filter out any assignments where the shop order has been cancelled
+    // (This handles old dirty database records from before the cancellation fix)
+    const validAssignments = assignment.filter(a => {
+      if (!a.orderId || !a.orderId.shopOrders) return false;
+      const so = a.orderId.shopOrders.find(so => so.shop.toString() === a.shop._id.toString());
+      if (!so || so.status.toLowerCase() === "cancelled" || so.status.toLowerCase() === "cancel") {
+        // Optionally mark it as failed in DB to clean it up
+        a.status = "failed";
+        a.save().catch(e => console.error(e));
+        return false;
+      }
+      return true;
+    });
+
+    const formated = validAssignments.map((a) => ({
       assignmentId: a._id,
       orderId: a.orderId._id,
       shopName: a.shop.name,
@@ -412,7 +470,7 @@ export const getDevliveryBoyAssignments = async (req, res) => {
       items:
         a.orderId.shopOrders.find(
           (so) => so.shop.toString() === a.shop._id.toString(),
-        ).shopOrderItems || [],
+        )?.shopOrderItems || [],
       subtotal: a.orderId.shopOrders.find(
         (so) => so.shop.toString() === a.shop._id.toString(),
       )?.subtotal,
@@ -608,22 +666,45 @@ export const getAssignmentBoys = async (req, res) => {
       orderId,
       shop: shopId,
       status: "brodcasted",
-    }).populate("brodcastedTo", "fullName mobile location");
+    });
 
     if (!assignment) {
       return res.status(200).json({ availableBoys: [] });
     }
 
-    // Find all boys who are currently assigned to an active order
-    const busyAssignments = await DeliveryAssignment.find({
-      status: "assigned",
-      assignedTo: { $in: assignment.brodcastedTo.map(b => b._id) }
-    });
-    const busyBoyIds = busyAssignments.map(a => a.assignedTo.toString());
+    const order = await Order.findById(orderId);
+    if (!order || !order.deliveryAddress) {
+      return res.status(200).json({ availableBoys: [] });
+    }
+    const { longitude, latitude } = order.deliveryAddress;
 
-    // Filter out busy boys
-    const availableBoys = assignment.brodcastedTo
-      .filter((b) => !busyBoyIds.includes(b._id.toString()))
+    // Run the live query again to get ALL currently online boys nearby
+    const nearByDeliveryBoys = await User.find({
+      role: "deliveryBoy",
+      isOnline: true,
+      location: {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [longitude, latitude],
+          },
+          $maxDistance: 5000,
+        },
+      },
+    });
+
+    const nearByIds = nearByDeliveryBoys.map((b) => b._id);
+
+    // Find busy ones
+    const busyIds = await DeliveryAssignment.find({
+      assignedTo: { $in: nearByIds },
+      status: { $nin: ["brodcasted", "completed", "failed"] },
+    }).distinct("assignedTo");
+
+    const busyIdset = new Set(busyIds.map((id) => id.toString()));
+
+    const availableBoys = nearByDeliveryBoys
+      .filter((b) => !busyIdset.has(b._id.toString()))
       .map((b) => ({
         id: b._id,
         name: b.fullName,
@@ -632,7 +713,54 @@ export const getAssignmentBoys = async (req, res) => {
         latitude: b.location?.coordinates?.[1],
       }));
 
+    // Update the assignment's broadcastedTo so new boys can accept it
+    assignment.brodcastedTo = availableBoys.map(b => b.id);
+    await assignment.save();
+
     return res.status(200).json({ availableBoys });
+  } catch (error) {
+    return res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+export const cancelOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findById(orderId);
+    
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+    
+    // Only allow cancellation if ALL shop orders are still Pending
+    const canCancel = order.shopOrders.every(so => so.status.toLowerCase() === 'pending');
+    
+    if (!canCancel) {
+      return res.status(400).json({ message: "Cannot cancel order. It is already being processed." });
+    }
+    
+    // Update all shop orders to Cancelled
+    order.shopOrders.forEach(so => {
+      so.status = "Cancelled";
+    });
+    
+    await order.save();
+    
+    // In a real production app, if paymentMethod === "online", we would call Razorpay Refund API here.
+    
+    const io = getIo();
+    // Notify shop owners
+    order.shopOrders.forEach(so => {
+      if (so.shopOwner) {
+        io.to(so.shopOwner.toString()).emit("order:status_updated", {
+          orderId: order._id,
+          shopId: so.shop.toString(),
+          status: "Cancelled"
+        });
+      }
+    });
+    
+    return res.status(200).json({ message: "Order cancelled successfully" });
   } catch (error) {
     return res.status(500).json({ message: "Server Error", error: error.message });
   }

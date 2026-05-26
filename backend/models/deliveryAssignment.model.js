@@ -7,7 +7,7 @@ const devliveryAssignmentSchema = new mongoose.Schema({
     brodcastedTo:[{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     acceptedAt: { type: Date, default: Date.now },
-    status: { type: String, enum: ['assigned', 'brodcasted', 'completed'], default: 'brodcasted' },
+    status: { type: String, enum: ['assigned', 'brodcasted', 'completed', 'failed', 'cancelled'], default: 'brodcasted' },
 }, {timestamps: true});
 
 const DeliveryAssignment = mongoose.model('DeliveryAssignment', devliveryAssignmentSchema);

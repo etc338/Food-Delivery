@@ -1,4 +1,5 @@
 import User from "../models/user.model.js";
+import { getIo } from "../socket.js";
 
 export const getCurrentUser = async (req, res) => {
     try {
@@ -29,6 +30,33 @@ export const updateUserLocation = async (req, res) => {
         }
 
         return res.status(200).json({ message: 'Location updated successfully', user });
+    } catch (error) {
+        return res.status(500).json({ message: "Server Error", error: error.message });
+    }
+}
+
+export const toggleOnlineStatus = async (req, res) => {
+    try {
+        const { isOnline } = req.body;
+        const user = await User.findByIdAndUpdate(
+            req.userId,
+            { isOnline },
+            { new: true }
+        ).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        // Emit delivery_boy_free to trigger shop owners to refresh their available lists on ANY status change
+        try {
+            const io = getIo();
+            io.emit("delivery_boy_free");
+        } catch (err) {
+            console.error("Socket error when changing status:", err);
+        }
+        
+        return res.status(200).json({ message: `Status updated to ${isOnline ? 'Online' : 'Offline'}`, isOnline: user.isOnline });
     } catch (error) {
         return res.status(500).json({ message: "Server Error", error: error.message });
     }

@@ -11,6 +11,7 @@ import {
   verifyPayment,
   trackOrder,
   getAssignmentBoys,
+  cancelOrder,
 } from "../controllers/order.controller.js";
 
 const orderRoutes = express.Router();
@@ -25,5 +26,6 @@ orderRoutes.put("/update-status/:orderId/:shopId", isAuth, updateOrderStatus);
 orderRoutes.get("/accept-order/:assignmentId", isAuth, acceptOrder);
 orderRoutes.get("/get-assignment-boys/:orderId/:shopId", isAuth, getAssignmentBoys);
 orderRoutes.get("/track/:orderId/:shopId", isAuth, trackOrder);
+orderRoutes.put("/cancel-order/:orderId", isAuth, cancelOrder);
 
 export default orderRoutes;
