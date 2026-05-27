@@ -11,6 +11,7 @@ import itemRoutes from "./routes/item.routes.js";
 import shopRoutes from "./routes/shop.routes.js";
 import orderRoutes from "./routes/order.routes.js";
 import reviewRoutes from "./routes/review.routes.js";
+import aiRoutes from "./routes/ai.routes.js";
 import { initSocket } from "./socket.js";
 
 const app = express();
@@ -30,6 +31,7 @@ app.use("/api/shop", shopRoutes);
 app.use("/api/item", itemRoutes);
 app.use("/api/order", orderRoutes);
 app.use("/api/review", reviewRoutes);
+app.use("/api/ai", aiRoutes);
 
 // If the port is still busy (race condition on restart), retry after 1.5s.
 httpServer.on("error", (err) => {

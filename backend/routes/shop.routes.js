@@ -1,11 +1,12 @@
 import express from "express"
 import { isAuth } from "../middlewares/isAuth.js"
-import { createEditShop, getFeaturedShops, getMyShop, getShopByCity } from "../controllers/shop.controller.js"
+import { createEditShop, getFeaturedShops, getMyShop, getShopByCity, toggleShopStatus } from "../controllers/shop.controller.js"
 import { upload } from "../middlewares/multer.js"
 
 const shopRoutes = express.Router()
 
 shopRoutes.post("/create-edit", isAuth, upload.single("image"), createEditShop)
+shopRoutes.put("/toggle-status", isAuth, toggleShopStatus)
 shopRoutes.get("/get-my", isAuth, getMyShop) 
 shopRoutes.get("/get-by-city/:city", isAuth, getShopByCity)
 shopRoutes.get("/featured", isAuth, getFeaturedShops)

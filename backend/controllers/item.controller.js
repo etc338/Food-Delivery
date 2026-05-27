@@ -1,6 +1,7 @@
 import Item from "../models/item.model.js";
 import Shop from "../models/shop.model.js";
 import uploadOnCloudinary from "../utilis/cloudinary.js";
+import { getIo } from "../socket.js";
 
 export const addItem = async (req, res) => {
   try {
@@ -35,6 +36,27 @@ export const addItem = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Server Error", error: error.message });
+  }
+};
+
+export const toggleItemStatus = async (req, res) => {
+  try {
+    const itemId = req.params.itemId;
+    const item = await Item.findById(itemId);
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+    
+    // Toggle the availability
+    item.isAvailable = item.isAvailable === false ? true : false;
+    await item.save();
+    
+    // Broadcast real-time update
+    getIo().emit("itemStatusChanged", { itemId: item._id, isAvailable: item.isAvailable });
+    
+    return res.status(200).json({ message: `Item is now ${item.isAvailable ? 'In Stock' : 'Out of Stock'}`, isAvailable: item.isAvailable });
+  } catch (error) {
+    return res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 

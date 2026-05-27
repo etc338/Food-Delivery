@@ -1,5 +1,6 @@
 import Shop from "../models/shop.model.js";
 import uploadOnCloudinary from "../utilis/cloudinary.js";
+import { getIo } from "../socket.js";
 
 export const createEditShop = async (req, res) => {
     try {
@@ -22,6 +23,24 @@ export const createEditShop = async (req, res) => {
         await shop.populate("owner items")
         return res.status(201).json({ message: 'Shop created successfully', shop
         })
+    } catch (error) {
+        return res.status(500).json({ message: "Server Error", error: error.message });
+    }
+}
+
+export const toggleShopStatus = async (req, res) => {
+    try {
+        const shop = await Shop.findOne({ owner: req.userId });
+        if (!shop) {
+            return res.status(404).json({ message: "Shop not found" });
+        }
+        shop.isOpen = !shop.isOpen;
+        await shop.save();
+        
+        // Broadcast the real-time update to all customers
+        getIo().emit("shopStatusChanged", { shopId: shop._id, isOpen: shop.isOpen });
+        
+        return res.status(200).json({ message: `Shop is now ${shop.isOpen ? 'Open' : 'Closed'}`, isOpen: shop.isOpen });
     } catch (error) {
         return res.status(500).json({ message: "Server Error", error: error.message });
     }
