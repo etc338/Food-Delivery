@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useEffect, useRef } from "react";
+import React, { createContext, useContext, useEffect } from "react";
 import { io } from "socket.io-client";
 import { useSelector } from "react-redux";
 import { serverUrl } from "../App";
@@ -30,6 +30,7 @@ export function SocketProvider({ children }) {
       socket.disconnect();
       setSocketObj({ current: null });
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData?._id]);
 
   return (

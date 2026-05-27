@@ -33,6 +33,7 @@ export default function UserDashboard() {
   // ── REAL-TIME SOCKET LISTENER FOR SHOP STATUS ──
   useEffect(() => {
     if (!socketObj?.current) return;
+    const socket = socketObj.current;
 
     const handleShopStatus = ({ shopId, isOpen }) => {
       dispatch(updateShopStatus({ shopId, isOpen }));
@@ -45,12 +46,12 @@ export default function UserDashboard() {
       dispatch(updateItemStatus({ itemId, isAvailable }));
     };
 
-    socketObj.current.on("shopStatusChanged", handleShopStatus);
-    socketObj.current.on("itemStatusChanged", handleItemStatus);
+    socket.on("shopStatusChanged", handleShopStatus);
+    socket.on("itemStatusChanged", handleItemStatus);
 
     return () => {
-      socketObj.current.off("shopStatusChanged", handleShopStatus);
-      socketObj.current.off("itemStatusChanged", handleItemStatus);
+      socket.off("shopStatusChanged", handleShopStatus);
+      socket.off("itemStatusChanged", handleItemStatus);
     };
   }, [socketObj, dispatch]);
 

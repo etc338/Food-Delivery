@@ -19,6 +19,7 @@ export default function DeliveryBoyOrderCard({ data }) {
 
     socket.on("order:status_updated", handleStatusUpdate);
     return () => socket.off("order:status_updated", handleStatusUpdate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socketRef?.current, data._id]);
 
   const formatDate = (dateString) => {
@@ -28,8 +29,6 @@ export default function DeliveryBoyOrderCard({ data }) {
     });
   };
 
-  const status = data.shopOrders?.status || "Unknown";
-  
   const getStatusColor = (status) => {
     if (!status) return "text-gray-500 bg-gray-100";
     const s = status.toLowerCase();
