@@ -8,20 +8,19 @@ const SocketContext = createContext(null);
 
 export function SocketProvider({ children }) {
   const { userData } = useSelector((state) => state.user);
-  const socketRef = useRef(null);
+  const [socketObj, setSocketObj] = React.useState({ current: null });
 
   useEffect(() => {
     if (!userData?._id) {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
+      if (socketObj.current) {
+        socketObj.current.disconnect();
+        setSocketObj({ current: null });
       }
       return;
     }
 
-    socketRef.current = io(serverUrl, { withCredentials: true });
-
-    const socket = socketRef.current;
+    const socket = io(serverUrl, { withCredentials: true });
+    setSocketObj({ current: socket });
 
     socket.on("connect", () => {
       socket.emit("join", userData._id);
@@ -29,12 +28,12 @@ export function SocketProvider({ children }) {
 
     return () => {
       socket.disconnect();
-      socketRef.current = null;
+      setSocketObj({ current: null });
     };
   }, [userData?._id]);
 
   return (
-    <SocketContext.Provider value={socketRef}>
+    <SocketContext.Provider value={socketObj}>
       {children}
     </SocketContext.Provider>
   );

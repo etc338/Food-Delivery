@@ -6,28 +6,40 @@ import { serverUrl } from "../App";
 import { useSocket } from "../context/SocketContext";
 import { useDispatch, useSelector } from "react-redux";
 import { setItemsInMyCity } from "../redux/userSlice";
+import { FaBoxOpen, FaCheckCircle, FaTimesCircle, FaStar, FaExclamationCircle } from "react-icons/fa";
 
 export default function UserOrderCard({ data }) {
-  const [showTracking, setShowTracking] = useState(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [canReview, setCanReview] = useState(false);
-  const [orderStatus, setOrderStatus] = useState(
-    data.shopOrders?.[0]?.status || "pending"
-  );
+  const [shopStatuses, setShopStatuses] = useState(() => {
+    const statuses = {};
+    data.shopOrders?.forEach(so => {
+      statuses[so.shop._id] = so.status || "pending";
+    });
+    return statuses;
+  });
+
+  const [trackingShopId, setTrackingShopId] = useState(null);
+  const [reviewShopId, setReviewShopId] = useState(null);
+  const [shopCanReview, setShopCanReview] = useState({});
+  const [toastMessage, setToastMessage] = useState(null);
   
   const dispatch = useDispatch();
   const { currentCity, locationBlocked } = useSelector((state) => state.user);
 
+  const socketRef = useSocket();
+
   const handleCancelOrder = async () => {
     try {
       await axios.put(`${serverUrl}/api/order/cancel-order/${data._id}`, {}, { withCredentials: true });
-      setOrderStatus("Cancelled");
+      const newStatuses = {};
+      Object.keys(shopStatuses).forEach(id => newStatuses[id] = "Cancelled");
+      setShopStatuses(newStatuses);
+      setToastMessage({ type: "success", text: "Order cancelled successfully!" });
+      setTimeout(() => setToastMessage(null), 4000);
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to cancel order");
+      setToastMessage({ type: "error", text: error.response?.data?.message || "Failed to cancel order" });
+      setTimeout(() => setToastMessage(null), 4000);
     }
   };
-
-  const socketRef = useSocket();
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -35,65 +47,84 @@ export default function UserOrderCard({ data }) {
       day: "2-digit",
       month: "short",
       year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
     });
   };
 
   const canTrack = (status) =>
     ["Out Of Delivery", "picked", "preparing"].includes(status);
 
-  const isDelivered = (status) => status === "delivered";
+  const isDelivered = (status) => status === "delivered" || status === "Delivered";
 
-  const checkCanReview = async (status) => {
-    if (!isDelivered(status)) return;
+  const checkCanReview = async (shopId) => {
     try {
       const response = await axios.get(
-        `${serverUrl}/api/review/can-review/${data._id}`,
+        `${serverUrl}/api/review/can-review/${data._id}/${shopId}`,
         { withCredentials: true }
       );
-      setCanReview(response.data.canReview);
+      setShopCanReview(prev => ({ ...prev, [shopId]: response.data.canReview }));
     } catch (error) {
       console.error("Error checking review status:", error);
     }
   };
 
   useEffect(() => {
-    checkCanReview(orderStatus);
+    data.shopOrders?.forEach(so => {
+      if (isDelivered(shopStatuses[so.shop._id])) {
+        checkCanReview(so.shop._id);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    checkCanReview(orderStatus);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderStatus]);
+  }, [shopStatuses]);
 
   useEffect(() => {
     const socket = socketRef?.current;
     if (!socket) return;
 
-    const handleStatusUpdate = ({ orderId, status }) => {
+    const handleStatusUpdate = ({ orderId, shopId, status }) => {
       if (orderId?.toString() === data._id?.toString()) {
-        setOrderStatus(status);
-        if (status === "delivered") {
-          setShowTracking(false);
+        setShopStatuses(prev => ({ ...prev, [shopId]: status }));
+        if ((status === "delivered" || status === "Delivered") && trackingShopId === shopId) {
+          setTrackingShopId(null);
         }
       }
     };
 
     socket.on("order:status_updated", handleStatusUpdate);
     return () => socket.off("order:status_updated", handleStatusUpdate);
-  }, [socketRef?.current, data._id]);
+  }, [socketRef?.current, data._id, trackingShopId]);
+
+  const getStatusColor = (status) => {
+    if (!status) return "text-gray-500 bg-gray-100";
+    const s = status.toLowerCase();
+    if (s === "delivered") return "text-green-600 bg-green-50 border-green-200";
+    if (s === "cancelled") return "text-red-500 bg-red-50 border-red-200";
+    if (s === "out of delivery") return "text-blue-600 bg-blue-50 border-blue-200";
+    return "text-orange-500 bg-orange-50 border-orange-200";
+  };
+
+  const allPending = Object.values(shopStatuses).every(s => s.toLowerCase() === "pending");
 
   return (
-    <div className="bg-white rounded-lg shadow p-4 space-y-4">
-      {showReviewModal && (
+    <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 p-5 sm:p-6 space-y-6 hover:shadow-lg transition-all duration-300 w-full group relative">
+      
+      {/* Custom Toast Message replacing alert() */}
+      {toastMessage && (
+        <div className={`absolute -top-4 left-1/2 -translate-x-1/2 z-30 px-6 py-3 rounded-full shadow-lg font-bold text-sm flex items-center gap-2 animate-slideDown ${toastMessage.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+          {toastMessage.type === 'error' ? <FaTimesCircle /> : <FaCheckCircle />}
+          {toastMessage.text}
+        </div>
+      )}
+
+      {reviewShopId && (
         <ReviewModal
           order={data}
-          shopId={data.shopOrders?.[0]?.shop?._id}
-          onClose={() => setShowReviewModal(false)}
+          shopId={reviewShopId}
+          onClose={() => setReviewShopId(null)}
           onSuccess={async () => {
-            setCanReview(false);
-            setShowReviewModal(false);
-            
+            setShopCanReview(prev => ({ ...prev, [reviewShopId]: false }));
+            setReviewShopId(null);
             try {
               const url = locationBlocked || !currentCity
                 ? `${serverUrl}/api/item/trending`
@@ -107,76 +138,105 @@ export default function UserOrderCard({ data }) {
         />
       )}
 
-      <div className="flex justify-between border-b pb-2">
+      <div className="flex flex-col sm:flex-row justify-between border-b border-gray-100 pb-4 gap-3">
         <div>
-          <p className="font-semibold">order #{data?._id?.slice(-6)}</p>
-          <p className="text-sm text-gray-500">Date: {formatDate(data.createdAt)}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <FaBoxOpen className="text-gray-400" />
+            <p className="font-bold text-gray-800 text-lg">Order #{data?._id?.slice(-6).toUpperCase()}</p>
+          </div>
+          <p className="text-sm font-medium text-gray-500">{formatDate(data.createdAt)}</p>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-500">{data.paymentMethod?.toUpperCase()}</p>
-          <p className="font-medium text-blue-600">{orderStatus}</p>
+        <div className="text-left sm:text-right">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Payment Method</p>
+          <span className="font-black text-gray-800">{data.paymentMethod?.toUpperCase()}</span>
         </div>
       </div>
 
-      {data.shopOrders?.map((shopOrder, index) => (
-        <div key={index} className="border rounded-lg p-3 bg-[#fffaf7] space-y-3">
-          <p className="font-semibold">{shopOrder.shop.name}</p>
-          <div className="flex space-x-4 overflow-x-auto pb-2">
-            {shopOrder.shopOrderItems.map((item, idx) => (
-              <div key={idx} className="flex-shrink-0 w-40 border rounded-lg p-2 bg-white">
-                <img src={item.image} alt="" className="w-full h-24 object-cover rounded" />
-                <p className="text-sm font-semibold mt-1">{item.name}</p>
-                <p className="text-xs text-gray-500">
-                  Qty: {item.quantity} x ₹{item.price}
-                </p>
+      {data.shopOrders?.map((shopOrder, index) => {
+        const currentShopStatus = shopStatuses[shopOrder.shop._id] || shopOrder.status;
+        
+        return (
+          <div key={index} className="rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-orange-50/50 to-white border border-orange-100/50 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-orange-100/50 pb-3">
+              <p className="font-black text-gray-800 text-lg tracking-tight">{shopOrder.shop.name}</p>
+              <div className={`inline-block px-3 py-1 rounded-lg border text-sm font-bold capitalize w-fit ${getStatusColor(currentShopStatus)}`}>
+                {currentShopStatus}
               </div>
-            ))}
-          </div>
-          <div className="flex justify-between items-center border-t pt-2">
-            <p className="font-semibold">SubTotal: ₹{shopOrder.subtotal}</p>
-            <span className="text-sm font-medium text-blue-600">{orderStatus}</span>
-          </div>
-
-          {showTracking && canTrack(orderStatus) && (
-            <div className="mt-4 border-t pt-4">
-              <UserOrderTracking orderId={data._id} shopId={shopOrder.shop._id} />
             </div>
-          )}
-        </div>
-      ))}
+            
+            <div className="flex space-x-4 overflow-x-auto pb-3 scrollbar-hide">
+              {shopOrder.shopOrderItems.map((item, idx) => (
+                <div key={idx} className="flex-shrink-0 w-44 rounded-xl p-2.5 bg-white shadow-sm border border-gray-50 group-hover:shadow-md transition-shadow">
+                  <div className="w-full h-28 rounded-lg overflow-hidden mb-3">
+                    <img src={item.image || item.item?.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  </div>
+                  <p className="text-sm font-bold text-gray-800 line-clamp-1">{item.name}</p>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-xs font-medium text-gray-500">Qty: {item.quantity}</span>
+                    <span className="text-sm font-black text-[#ff4d2d]">₹{item.price}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center border-t border-orange-100/50 pt-3 gap-4">
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-gray-500 text-sm">Shop Subtotal:</p>
+                <p className="font-black text-gray-800">₹{shopOrder.subtotal}</p>
+              </div>
 
-      <div className="flex justify-between items-center border-t pt-2 gap-2">
-        <p className="font-semibold">Total: ₹{data.totalAmount}</p>
-        <div className="flex gap-2 flex-wrap justify-end">
-          {orderStatus?.toLowerCase() === "pending" && (
+              {/* Per-shop action buttons */}
+              <div className="flex flex-wrap gap-3">
+                {canTrack(currentShopStatus) && (
+                  <button
+                    onClick={() => setTrackingShopId(trackingShopId === shopOrder.shop._id ? null : shopOrder.shop._id)}
+                    className="bg-gradient-to-r from-[#ff4d2d] to-[#ff7a55] hover:shadow-lg hover:-translate-y-0.5 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 shadow-[#ff4d2d]/20"
+                  >
+                    {trackingShopId === shopOrder.shop._id ? "Hide Tracking" : "Track Driver"}
+                  </button>
+                )}
+
+                {isDelivered(currentShopStatus) && shopCanReview[shopOrder.shop._id] && (
+                  <button
+                    onClick={() => setReviewShopId(shopOrder.shop._id)}
+                    className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:shadow-lg hover:-translate-y-0.5 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 shadow-yellow-500/20"
+                  >
+                    <FaStar /> Rate Shop
+                  </button>
+                )}
+
+                {isDelivered(currentShopStatus) && !shopCanReview[shopOrder.shop._id] && shopCanReview[shopOrder.shop._id] !== undefined && (
+                  <div className="flex items-center gap-1.5 bg-green-50 text-green-600 px-4 py-2 rounded-xl text-sm font-bold border border-green-100">
+                    <FaCheckCircle /> Reviewed
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {trackingShopId === shopOrder.shop._id && canTrack(currentShopStatus) && (
+              <div className="mt-4 bg-white rounded-xl p-4 shadow-sm border border-gray-100 animate-slideDown">
+                <UserOrderTracking orderId={data._id} shopId={shopOrder.shop._id} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-t border-gray-100 pt-5 gap-4">
+        <div className="flex flex-col">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total Amount Paid</p>
+          <p className="font-black text-2xl text-gray-900">₹{data.totalAmount}</p>
+        </div>
+        
+        {/* Global Cancel Order if everything is pending */}
+        <div className="flex gap-3 flex-wrap w-full sm:w-auto justify-end">
+          {allPending && (
             <button
               onClick={handleCancelOrder}
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm transition-colors"
+              className="bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 text-gray-700 hover:text-red-600 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 hover:shadow-sm flex items-center gap-2"
             >
-              Cancel Order
+              <FaTimesCircle className="text-red-400" /> Cancel Entire Order
             </button>
-          )}
-
-          {canTrack(orderStatus) && (
-            <button
-              onClick={() => setShowTracking(!showTracking)}
-              className="bg-[#ff4d2d] hover:bg-[#e64526] text-white px-4 py-2 rounded-lg text-sm transition-colors"
-            >
-              {showTracking ? "Hide Tracking" : "Track Order"}
-            </button>
-          )}
-
-          {isDelivered(orderStatus) && canReview && (
-            <button
-              onClick={() => setShowReviewModal(true)}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-1"
-            >
-              ⭐ Rate Order
-            </button>
-          )}
-
-          {isDelivered(orderStatus) && !canReview && (
-            <span className="text-sm text-green-600 font-medium">✓ Reviewed</span>
           )}
         </div>
       </div>

@@ -716,6 +716,18 @@ export const getAssignmentBoys = async (req, res) => {
     // Update the assignment's broadcastedTo so new boys can accept it
     assignment.brodcastedTo = availableBoys.map(b => b.id);
     await assignment.save();
+    
+    try {
+      const io = getIo();
+      availableBoys.forEach((boy) => {
+        io.to(boy.id.toString()).emit("new:assignment", {
+          assignmentId: assignment._id,
+          deliveryAddress: order.deliveryAddress,
+        });
+      });
+    } catch(err) {
+      console.error(err);
+    }
 
     return res.status(200).json({ availableBoys });
   } catch (error) {

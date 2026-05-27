@@ -90,9 +90,9 @@ export const getShopReviews = async (req, res) => {
 
 export const canReview = async (req, res) => {
   try {
-    const { orderId } = req.params;
+    const { orderId, shopId } = req.params;
     
-    const existingReview = await Review.findOne({ user: req.userId, order: orderId });
+    const existingReview = await Review.findOne({ user: req.userId, order: orderId, shop: shopId });
     
     return res.status(200).json({ canReview: !existingReview });
   } catch (error) {

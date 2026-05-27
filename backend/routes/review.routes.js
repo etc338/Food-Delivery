@@ -6,6 +6,6 @@ const reviewRoutes = express.Router();
 
 reviewRoutes.post("/add", isAuth, addReview);
 reviewRoutes.get("/shop/:shopId", getShopReviews);
-reviewRoutes.get("/can-review/:orderId", isAuth, canReview);
+reviewRoutes.get("/can-review/:orderId/:shopId", isAuth, canReview);
 
 export default reviewRoutes;

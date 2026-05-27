@@ -42,6 +42,24 @@ const userSlice = createSlice({
     setShopInMyCity: (state, action) => {
       state.shopInMyCity = action.payload;
     },
+    updateShopStatus: (state, action) => {
+      if (state.shopInMyCity) {
+        const { shopId, isOpen } = action.payload;
+        const shop = state.shopInMyCity.find((s) => s._id === shopId);
+        if (shop) {
+          shop.isOpen = isOpen;
+        }
+      }
+    },
+    updateItemStatus: (state, action) => {
+      if (state.itemsInMyCity) {
+        const { itemId, isAvailable } = action.payload;
+        const item = state.itemsInMyCity.find((i) => i._id === itemId);
+        if (item) {
+          item.isAvailable = isAvailable;
+        }
+      }
+    },
     setItemsInMyCity: (state, action) => {
       state.itemsInMyCity = action.payload;
     },
@@ -118,6 +136,8 @@ export const {
   setLocationBlocked,
   setSearchQuery,
   setShopInMyCity,
+  updateShopStatus,
+  updateItemStatus,
   setItemsInMyCity,
   addToCart,
   updateQuantity,
