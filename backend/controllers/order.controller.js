@@ -1,4 +1,5 @@
 import DeliveryAssignment from "../models/deliveryAssignment.model.js";
+import Item from "../models/item.model.js";
 import Order from "../models/order.model.js";
 import Shop from "../models/shop.model.js";
 import User from "../models/user.model.js";
@@ -70,7 +71,7 @@ export const verifyPayment = async (req, res) => {
 
 export const placeOrder = async (req, res) => {
   try {
-    const { cartItems, paymentMethod, deliveryAddress, totalAmount } = req.body;
+    const { cartItems, paymentMethod, paymentId, deliveryAddress, totalAmount } = req.body;
     if (cartItems.length === 0 || !cartItems) {
       return res.status(400).json({ message: "Cart is empty" });
     }
@@ -82,14 +83,27 @@ export const placeOrder = async (req, res) => {
       return res.status(400).json({ message: "Delivery address is required" });
     }
     const groupItemsByShop = {};
-    cartItems.forEach((item) => {
+    for (const item of cartItems) {
       const shopId = item.shop;
       if (!groupItemsByShop[shopId]) {
         groupItemsByShop[shopId] = [];
       }
+      
+      // CRITICAL SECURITY FIX: Fetch the REAL item from the database
+      // Never trust the price sent by the frontend, a hacker could change it to ₹1!
+      const DatabaseItem = await Item.findById(item.id || item._id);
+      if (!DatabaseItem) {
+         return res.status(404).json({ message: `Item not found in database: ${item.name}` });
+      }
+
+      // Override the frontend price with the authoritative database price
+      item.realPrice = DatabaseItem.price;
       groupItemsByShop[shopId].push(item);
-    });
+    }
+    
     const shopOrders = [];
+    let backendCalculatedTotal = 0; // The true total
+    
     for (const shopId of Object.keys(groupItemsByShop)) {
       const shop = await Shop.findById(shopId).populate("owner");
       if (!shop) {
@@ -102,16 +116,18 @@ export const placeOrder = async (req, res) => {
       }
       const items = groupItemsByShop[shopId];
       const subtotal = items.reduce(
-        (acc, item) => acc + item.price * item.quantity,
+        (acc, item) => acc + item.realPrice * item.quantity,
         0,
       );
+      backendCalculatedTotal += subtotal;
+      
       shopOrders.push({
         shop: shop._id,
         shopOwner: shop.owner._id,
         subtotal,
         shopOrderItems: items.map((item) => ({
           item: item.id || item._id,
-          price: item.price,
+          price: item.realPrice, // Saved the real price!
           quantity: item.quantity,
           name: item.name,
           image: item.image,
@@ -119,10 +135,20 @@ export const placeOrder = async (req, res) => {
       });
     }
 
+    // Add delivery fee logic just like frontend
+    const deliveryFee = backendCalculatedTotal > 500 ? 0 : 40;
+    backendCalculatedTotal += deliveryFee;
+
+    // Security check: Did the user pay the correct amount?
+    if (paymentMethod === "online" && totalAmount !== backendCalculatedTotal) {
+       return res.status(400).json({ message: "Security Alert: Payment amount mismatch detected." });
+    }
+
     // Create the order
     const order = new Order({
       user: req.userId,
       paymentMethod,
+      paymentId,
       deliveryAddress,
       totalAmount,
       shopOrders,
@@ -160,6 +186,7 @@ export const getMyOrders = async (req, res) => {
     if (user.role == "user") {
       const orders = await Order.find({ user: req.userId })
         .sort({ createdAt: -1 })
+        .limit(50)
         .populate("shopOrders.shop", "name")
         .populate("shopOrders.shopOwner", "name email mobile")
         .populate("shopOrders.shopOrderItems.item", "name image price");
@@ -167,6 +194,7 @@ export const getMyOrders = async (req, res) => {
     } else if (user.role == "owner") {
       const orders = await Order.find({ "shopOrders.shopOwner": req.userId })
         .sort({ createdAt: -1 })
+        .limit(50)
         .populate("shopOrders.shop", "name")
         .populate("user")
         .populate("shopOrders.shopOrderItems.item", "name image price")
@@ -188,6 +216,7 @@ export const getMyOrders = async (req, res) => {
     } else if (user.role == "deliveryBoy") {
       const orders = await Order.find({ "shopOrders.assignedDeliveryBoy": req.userId })
         .sort({ createdAt: -1 })
+        .limit(50)
         .populate("shopOrders.shop", "name")
         .populate("user", "fullName mobile email")
         .populate("shopOrders.shopOrderItems.item", "name image price");
@@ -240,6 +269,50 @@ export const updateOrderStatus = async (req, res) => {
       await DeliveryAssignment.findByIdAndUpdate(shopOrder.assignment, {
         status: "completed",
       });
+      
+      // ── DYNAMIC ALGORITHMIC EARNINGS (Surge Pricing) ──
+      if (shopOrder.assignedDeliveryBoy) {
+        const dboy = await User.findById(shopOrder.assignedDeliveryBoy);
+        
+        let distanceKm = 5; // Default average distance
+        // Calculate distance from the delivery boy's last recorded GPS to customer
+        if (dboy && dboy.location?.coordinates && order.deliveryAddress) {
+           distanceKm = calculateDistance(
+             order.deliveryAddress.latitude, 
+             order.deliveryAddress.longitude, 
+             dboy.location.coordinates[1], 
+             dboy.location.coordinates[0]
+           );
+           // If they are already standing at the customer door, distance might be 0. 
+           // We ensure a minimum distance pay of 2km just in case.
+           if (distanceKm < 2) distanceKm = 2; 
+        }
+
+        // 1. Base Pay (Standard pick-up fee)
+        let payout = 20; 
+        
+        // 2. Distance Pay (₹7 for every kilometer driven)
+        payout += (distanceKm * 7); 
+        
+        // 3. Time Zone & Traffic Surge Modifiers
+        const currentHour = new Date().getHours();
+        
+        if (currentHour >= 23 || currentHour <= 4) {
+          payout += 30; // Late Night Surge (Harder to find drivers)
+        } else if (currentHour >= 19 && currentHour <= 22) {
+          payout += 15; // Peak Dinner Traffic Surge
+        } else if (currentHour >= 12 && currentHour <= 15) {
+          payout += 10; // Peak Lunch Traffic Surge
+        }
+
+        const finalPayout = Math.ceil(payout);
+
+        await User.findByIdAndUpdate(shopOrder.assignedDeliveryBoy, {
+          $inc: { totalEarnings: finalPayout }
+        });
+        console.log(`Paid dynamic fee of ₹${finalPayout} (Dist: ${distanceKm.toFixed(1)}km, Hr: ${currentHour}) to Driver ${shopOrder.assignedDeliveryBoy}`);
+      }
+
       try {
         const io = getIo();
         io.emit("delivery_boy_free");
@@ -797,9 +870,25 @@ export const cancelOrder = async (req, res) => {
       so.status = "Cancelled";
     });
     
-    await order.save();
+    // Automatic Razorpay Refund
+    if (order.paymentMethod === "online" && order.paymentId) {
+      try {
+        const instance = new Razorpay({
+          key_id: process.env.RAZORPAY_KEY_ID,
+          key_secret: process.env.RAZORPAY_KEY_SECRET,
+        });
+        // We refund the full amount. In a real app you might want partial refunds if only one shop cancelled.
+        await instance.payments.refund(order.paymentId, {
+          amount: order.totalAmount * 100, // paise
+          speed: "optimum"
+        });
+        console.log(`Successfully refunded ${order.totalAmount} for order ${order._id}`);
+      } catch (refundError) {
+        console.error("Razorpay refund failed:", refundError);
+      }
+    }
     
-    // In a real production app, if paymentMethod === "online", we would call Razorpay Refund API here.
+    await order.save();
     
     const io = getIo();
     // Notify shop owners

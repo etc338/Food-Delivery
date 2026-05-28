@@ -35,6 +35,7 @@ const orderSchema = new Mongoose.Schema(
   {
     user: { type: Mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     paymentMethod: { type: String, enum: ["cod", "online"], required: true },
+    paymentId: { type: String }, // Stores Razorpay Payment ID for refunds
     deliveryAddress: {
       text: { type: String, required: true },
       latitude: { type: Number, required: true },

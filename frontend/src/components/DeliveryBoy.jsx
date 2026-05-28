@@ -147,6 +147,12 @@ export default function DeliveryBoy() {
             Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff4d2d] to-[#ff7a55]">{userData?.fullName}</span>
           </h1>
           
+          {/* EARNINGS WALLET DISPLAY */}
+          <div className="flex flex-col items-center justify-center bg-gradient-to-br from-green-50 to-green-100/50 px-8 py-4 rounded-[20px] border border-green-200 shadow-sm mt-2 mb-1 w-full max-w-[250px] transform transition-transform hover:scale-105">
+            <span className="text-[11px] font-black text-green-600 uppercase tracking-widest mb-1">Lifetime Earnings</span>
+            <span className="text-3xl font-black text-green-700">₹{userData?.totalEarnings || 0}</span>
+          </div>
+          
           <div className="flex items-center gap-2 bg-gray-50/80 px-5 py-2.5 rounded-2xl text-sm font-medium border border-gray-100">
             <FaMapMarkerAlt className="text-[#ff4d2d]" />
             {locationName ? (

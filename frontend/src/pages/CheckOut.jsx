@@ -142,7 +142,7 @@ export default function CheckOut() {
             );
 
             if (verifyResult.data.message === "Payment verified successfully") {
-              placeOrderToDB();
+              placeOrderToDB(response.razorpay_payment_id);
             } else {
               setToastMessage({ type: "error", text: "Payment verification failed" });
               setTimeout(() => setToastMessage(null), 4000);
@@ -164,11 +164,11 @@ export default function CheckOut() {
         console.error("Error creating Razorpay Order:", err);
       }
     } else {
-      placeOrderToDB();
+      placeOrderToDB(null);
     }
   };
 
-  const placeOrderToDB = async () => {
+  const placeOrderToDB = async (paymentId = null) => {
     try {
       const result = await axios.post(
         `${serverUrl}/api/order/place-order`,
@@ -181,6 +181,7 @@ export default function CheckOut() {
           },
           totalAmount,
           paymentMethod,
+          paymentId,
         },
         { withCredentials: true },
       );

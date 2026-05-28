@@ -21,9 +21,12 @@ initSocket(httpServer);
 
 const port = process.env.PORT || 8000;
 
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:5173", credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
+
+// Trust the proxy (Required for express-rate-limit to get the real IP if hosted online)
+app.set("trust proxy", 1);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);

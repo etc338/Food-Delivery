@@ -41,6 +41,10 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    totalEarnings: {
+        type: Number,
+        default: 0,
+    }
 }, {timestamps: true});
 
 userSchema.index({ location: '2dsphere' });
