@@ -2,6 +2,7 @@ import Item from "../models/item.model.js";
 import Shop from "../models/shop.model.js";
 import uploadOnCloudinary from "../utilis/cloudinary.js";
 import { getIo } from "../socket.js";
+import { generateEmbedding } from "../utilis/embedding.js";
 
 export const addItem = async (req, res) => {
   try {
@@ -15,6 +16,11 @@ export const addItem = async (req, res) => {
       return res.status(400).json({ message: "shop not found" });
     }
     console.log(shop, "shop");
+
+    // Generate vector embedding for RAG
+    const textToEmbed = `${name} - ${category} - ${foodType}`;
+    const embedding = await generateEmbedding(textToEmbed);
+
     const item = await Item.create({
       name,
       image,
@@ -22,6 +28,7 @@ export const addItem = async (req, res) => {
       category,
       foodType,
       price,
+      embedding: embedding.length > 0 ? embedding : undefined, // Save embedding
     });
     shop.items.push(item._id);
     await shop.save();
@@ -68,15 +75,26 @@ export const editItem = async (req, res) => {
     if (req.file) {
       image = await uploadOnCloudinary(req.file.path);
     }
+    
+    // Update vector embedding for RAG
+    const textToEmbed = `${name} - ${category} - ${foodType}`;
+    const embedding = await generateEmbedding(textToEmbed);
+    
+    const updateData = {
+      name,
+      image,
+      category,
+      foodType,
+      price,
+    };
+    
+    if (embedding.length > 0) {
+      updateData.embedding = embedding;
+    }
+
     const item = await Item.findByIdAndUpdate(
       itemId,
-      {
-        name,
-        image,
-        category,
-        foodType,
-        price,
-      },
+      updateData,
       { new: true }
     );
     if (!item) {

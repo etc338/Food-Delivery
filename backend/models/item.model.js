@@ -32,6 +32,7 @@ const itemSchema = new mongoose.Schema(
       count: { type: Number, default: 0 },
     },
     isAvailable: { type: Boolean, default: true }, // Tracks if item is in stock
+    embedding: { type: [Number], select: false }, // Vector embedding for AI search
   },
   { timestamps: true }
 );

@@ -6,6 +6,22 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { getIo } from "../socket.js";
 
+// ─────────────────────────────────────────────────────────────────
+//  HELPER: Calculate Distance (Haversine Formula)
+// ─────────────────────────────────────────────────────────────────
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+  return R * c; 
+}
+
 export const createRazorpayOrder = async (req, res) => {
   try {
     const instance = new Razorpay({
@@ -645,12 +661,37 @@ export const trackOrder = async (req, res) => {
     if (!shopOrder) {
       return res.status(404).json({ message: "Shop order not found" });
     }
+    
+    // ── LIVE ETA CALCULATION ──
+    let estimatedTime = "Calculating...";
+    const currentStatus = shopOrder.status?.toLowerCase() || "pending";
+    
+    if (currentStatus === "out of delivery" || currentStatus === "picked") {
+      const dboy = shopOrder.assignedDeliveryBoy;
+      if (dboy && dboy.location?.coordinates && order.deliveryAddress) {
+        const dboyLon = dboy.location.coordinates[0];
+        const dboyLat = dboy.location.coordinates[1];
+        const userLat = order.deliveryAddress.latitude;
+        const userLon = order.deliveryAddress.longitude;
+        
+        const distanceKm = calculateDistance(userLat, userLon, dboyLat, dboyLon);
+        const etaMins = Math.ceil((distanceKm / 20) * 60) + 5;
+        
+        estimatedTime = `~${etaMins} mins`;
+      } else {
+        estimatedTime = "10-15 mins";
+      }
+    } else if (currentStatus === "preparing") {
+      estimatedTime = "25-30 mins";
+    } else if (currentStatus === "pending") {
+      estimatedTime = "35-40 mins";
+    }
 
     return res.status(200).json({
       status: shopOrder.status,
       deliveryBoy: shopOrder.assignedDeliveryBoy,
       deliveryAddress: order.deliveryAddress,
-      estimatedTime: "20-30 mins",
+      estimatedTime: estimatedTime,
     });
   } catch (error) {
     return res
