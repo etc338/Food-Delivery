@@ -29,9 +29,10 @@ export default function SignUp() {
       const result = await axios.post(`${serverUrl}/api/auth/signup`, payload, {
         withCredentials: true,
       });
-      dispatch(setUserData(result.data));
+      dispatch(setUserData(result.data.user));
       setErr("");
       setLoading(false);
+      navigate("/");
     } catch (error) {
       setErr(error?.response?.data?.message || "Sign up failed");
       setLoading(false);
@@ -56,6 +57,7 @@ export default function SignUp() {
         { withCredentials: true }
       );
       dispatch(setUserData(data.user));
+      navigate("/");
     } catch (error) {
       console.log(error);
     }

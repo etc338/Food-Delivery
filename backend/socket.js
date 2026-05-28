@@ -6,7 +6,18 @@ let io;
 export const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: "http://localhost:5173",
+      origin: function (origin, callback) {
+        const allowed = [
+          "http://localhost:5173",
+          "http://localhost:3000",
+          process.env.FRONTEND_URL
+        ];
+        if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS: ' + origin));
+        }
+      },
       credentials: true,
     },
   });
