@@ -22,7 +22,7 @@ import useGetMyOrders from "./hooks/useGetMyOrders";
 import useUpdateLocation from "./hooks/useUpdateLocation";
 import AiChatbot from "./components/AiChatbot";
 
-export const serverUrl = "http://localhost:8000";
+export const serverUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 export default function App() {
   useGetCurrentUser();
   useUpdateLocation();
