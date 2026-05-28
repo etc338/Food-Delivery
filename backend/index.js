@@ -22,7 +22,19 @@ initSocket(httpServer);
 const port = process.env.PORT || 8000;
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: function (origin, callback) {
+    const allowed = [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      process.env.FRONTEND_URL
+    ];
+    // Allow if it's in the allowed list, OR if it's a Vercel deployment, OR if there's no origin (like Postman)
+    if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS: ' + origin));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
