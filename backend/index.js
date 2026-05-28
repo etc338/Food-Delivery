@@ -21,7 +21,7 @@ initSocket(httpServer);
 
 const port = process.env.PORT || 8000;
 
-app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:5173", credentials: true }));
+app.use(cors({origin:"*"}));
 app.use(express.json());
 app.use(cookieParser());
 
