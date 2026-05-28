@@ -87,6 +87,7 @@ export default function AiChatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [lastFailedPrompt, setLastFailedPrompt] = useState(null);
   const [showQuickPrompts, setShowQuickPrompts] = useState(true);
 
@@ -114,6 +115,26 @@ export default function AiChatbot() {
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     }
   }, [messages, isOpen]);
+
+  // ── Dynamic Loading UX
+  // Cycles through loading messages every 2 seconds to keep the user engaged
+  const loadingMessages = [
+    "Understanding your request...",
+    "Scanning the Vingo menu...",
+    "Finding the best matches...",
+    "Writing a recommendation..."
+  ];
+
+  useEffect(() => {
+    let interval;
+    if (isLoading) {
+      setLoadingStep(0);
+      interval = setInterval(() => {
+        setLoadingStep((prev) => Math.min(prev + 1, loadingMessages.length - 1));
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   // Focus input field when chat opens
   useEffect(() => {
@@ -319,18 +340,21 @@ export default function AiChatbot() {
             </div>
           ))}
 
-          {/* Typing indicator — 3 bouncing dots while waiting for Gemini */}
+          {/* Typing indicator — Dynamic multi-step UX */}
           {isLoading && (
             <div className="flex items-end gap-2">
               <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[#ff4d2d] to-[#ff7a55] flex items-center justify-center flex-shrink-0">
                 <MdAutoAwesome className="text-white text-[10px]" />
               </div>
-              <div className="bg-white border border-gray-100 px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm">
-                <div className="flex items-center gap-1">
+              <div className="bg-white border border-gray-100 px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm min-w-[200px]">
+                <div className="flex items-center gap-1.5 mb-2">
                   <div className="w-1.5 h-1.5 bg-[#ff4d2d] rounded-full animate-bounce" />
                   <div className="w-1.5 h-1.5 bg-[#ff4d2d] rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
                   <div className="w-1.5 h-1.5 bg-[#ff4d2d] rounded-full animate-bounce" style={{ animationDelay: "0.4s" }} />
                 </div>
+                <p className="text-xs font-bold text-gray-500 animate-pulse transition-all duration-300">
+                  {loadingMessages[loadingStep]}
+                </p>
               </div>
             </div>
           )}

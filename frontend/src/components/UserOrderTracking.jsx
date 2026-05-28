@@ -220,9 +220,22 @@ export default function UserOrderTracking({ orderId, shopId }) {
         <p className="text-gray-700">
           <span className="font-semibold">Phone:</span> {trackingData.deliveryBoy.mobile}
         </p>
-        <p className="text-sm text-gray-600 mt-2">
-          📍 Distance: <span className="font-bold text-[#ff4d2d]">{distance} km</span> away
-        </p>
+        
+        <div className="flex flex-col gap-2 mt-3 bg-gray-50 border border-gray-100 p-3 rounded-lg">
+          <p className="text-sm text-gray-600 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">📍 Distance Away</span>
+            <span className="font-bold text-[#ff4d2d]">{distance} km</span>
+          </p>
+          {trackingData.estimatedTime && (
+            <div className="h-[1px] w-full bg-gray-200"></div>
+          )}
+          {trackingData.estimatedTime && (
+            <p className="text-sm text-gray-600 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">⏳ Expected Arrival</span>
+              <span className="font-bold text-[#ff4d2d]">{trackingData.estimatedTime}</span>
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="rounded-xl overflow-hidden border-2 border-gray-200 shadow-lg">
