@@ -22,6 +22,7 @@ import useGetMyOrders from "./hooks/useGetMyOrders";
 import useUpdateLocation from "./hooks/useUpdateLocation";
 import AiChatbot from "./components/AiChatbot";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const serverUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 export default function App() {
   useGetCurrentUser();
