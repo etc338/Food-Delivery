@@ -84,7 +84,9 @@ export const placeOrder = async (req, res) => {
     }
     const groupItemsByShop = {};
     for (const item of cartItems) {
-      const shopId = item.shop;
+      // Safely extract the shop ID, whether the frontend sent it as a string or a populated object.
+      const shopId = typeof item.shop === "object" ? (item.shop._id || item.shop.id) : item.shop;
+      
       if (!groupItemsByShop[shopId]) {
         groupItemsByShop[shopId] = [];
       }
